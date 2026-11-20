@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Findr | CICS Building Guide</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="authView" class="auth-shell">
+    <aside class="auth-brand">
+      <a class="brand light" href="#"><span class="brand-mark">⌖</span><span>Findr<small>CICS BUILDING GUIDE</small></span></a>
+      <div class="brand-copy"><small>CICS BUILDING GUIDE</small><h1>Your campus,<br>easier to navigate.</h1>
+        <p>Find rooms, explore every floor, and report building concerns through one secure university platform.</p></div>
+      <span class="brand-foot">Batangas State University · CICS</span>
+    </aside>
+    <main class="auth-panel">
+      <section id="loginPanel" class="auth-card-wrap">
+        <small class="eyebrow">WELCOME BACK</small><h2 id="loginHeading">Student Login</h2>
+        <p class="muted">Use your registered student username or email address.</p>
+        <div class="tabs"><button class="tab active" data-role="student">Student Login</button><button class="tab" data-role="admin">Admin Login</button></div>
+        <form id="loginForm" class="card form-card">
+          <label>Username or email<input name="identifier" required placeholder="Enter your email or username"></label>
+          <label>Password<div class="password-wrap"><input name="password" type="password" required minlength="8" placeholder="At least 8 characters"><button type="button" class="show-password">SHOW</button></div></label>
+          <div class="right"><a href="#" id="forgotLink">Forgot Password?</a></div>
+          <button class="btn primary full" type="submit">Login as Student</button>
+          <p id="loginMessage" class="message"></p>
+        </form>
+        <p class="center muted">New student or staff? <a href="#" id="showRegister">Create an account</a></p>
+      </section>
+      <section id="registerPanel" class="auth-card-wrap hidden">
+        <small class="eyebrow">JOIN THE CICS COMMUNITY</small><h2>Create your account</h2>
+        <p class="muted">Create an account to use CICS navigation and reporting.</p>
+        <form id="registerForm" class="card form-card">
+          <div class="two-col"><label>Full name<input name="full_name" required placeholder="Your full name"></label><label>Username<input name="username" required placeholder="Choose username"></label></div>
+          <label>Email address<input name="email" type="email" required placeholder="you@example.com"></label>
+          <div class="two-col"><label>Password<input name="password" type="password" minlength="8" required placeholder="At least 8 characters"></label><label>Confirm password<input name="confirm_password" type="password" required placeholder="Repeat password"></label></div>
+          <label>Account type<select name="role" id="registerRole"><option value="student">Student</option><option value="admin">Administrator</option></select></label>
+          <label id="adminCodeWrap" class="hidden">Admin registration code<input name="admin_code" placeholder="Enter authorized code"></label>
+          <button class="btn primary full" type="submit">Create Account</button><p id="registerMessage" class="message"></p>
+        </form>
+        <p class="center muted">Already have an account? <a href="#" id="showLogin">Student login</a></p>
+      </section>
+    </main>
+  </div>
+
+  <div id="appView" class="hidden">
+    <header class="topbar">
+      <a class="brand" href="#" data-page="home"><span class="brand-mark">⌖</span><span>Findr<small>CICS BUILDING GUIDE</small></span></a>
+      <button class="mobile-menu" id="menuToggle">☰</button>
+      <nav id="mainNav">
+        <button data-page="home" class="nav-link active">Home</button>
+        <button data-page="map" class="nav-link">Building Map</button>
+        <button data-page="home" id="adminDashboardNav" class="nav-link admin-only-nav hidden">Admin Dashboard</button>
+        <button data-page="report" class="nav-link">Report a Problem</button>
+        <button data-page="about" class="nav-link">About</button>
+        <button id="logoutBtn" class="nav-link logout">Logout</button>
+      </nav>
+      <span id="userBadge" class="user-badge"></span>
+    </header>
+
+    <main>
+      <section id="homePage" class="page">
+        <div class="hero">
+          <div class="hero-copy"><small class="eyebrow">CICS BUILDING GUIDE</small><h1>Find Your Way<br>Around CICS.</h1>
+            <p>Navigate rooms, laboratories, and offices with confidence. Findr puts the entire CICS Building at your fingertips.</p>
+            <div class="search-row"><input id="homeSearch" placeholder="⌕  Search room, laboratory, or office..."><button class="btn primary" id="homeSearchBtn">Explore Building Map →</button></div>
+            <button class="text-button" data-page="map">View all destinations →</button>
+          </div>
+          <div class="hero-preview"><div class="preview-top"><span>▦</span><b>CICS Building</b><span class="status">● DIRECTORY</span></div><div class="mini-grid"><span>Room 101</span><span>Room 102</span><span class="selected">Room 103</span><span>Room 104</span><span>Room 105</span><span>Lab 1</span></div><div class="preview-note">⌖ CICS Student Services</div></div>
+        </div>
+        <section class="quick-section"><div class="section-heading"><small class="eyebrow">QUICK ACCESS</small><h2>Where would you like to go?</h2></div>
+          <div class="quick-grid">
+            <button class="quick-card" data-page="rules"><span class="quick-icon blue">▣</span><b>Room Rules</b><small>Read the guidelines for using CICS rooms</small></button>
+            <button class="quick-card" data-quick-mode="laboratories"><span class="quick-icon green">♧</span><b>View Laboratories</b><small>Explore laboratory destinations</small></button>
+            <button class="quick-card" data-quick-mode="offices"><span class="quick-icon purple">▤</span><b>Locate Offices</b><small>Find offices on the 1st and 2nd floors</small></button>
+            <button class="quick-card" data-page="report"><span class="quick-icon orange">△</span><b>Report a Problem</b><small>Tell us about an issue</small></button>
+          </div>
+        </section>
+        <section id="adminIntegrationPanel" class="quick-section hidden">
+          <div class="section-heading"><small class="eyebrow">SYSTEM INTEGRATION</small><h2>Connected services</h2><p class="muted">Live status of Findr's connected systems and services.</p></div>
+          <div id="integrationStatus" class="feature-grid"><article><b>Checking services…</b><p>Please wait.</p></article></div>
+        </section>
+        <section id="adminReportsPanel" class="quick-section admin-reports-section hidden">
+          <div class="section-heading admin-section-heading"><div><small class="eyebrow">ADMINISTRATION</small><h2>Submitted problem reports</h2><p class="muted">Review reports submitted by students, check their details, and update their status.</p></div><button class="btn outline" id="adminReportRefresh" type="button">↻ Refresh reports</button></div>
+          <div id="adminReportSummary" class="admin-report-summary"></div>
+          <div class="admin-report-toolbar"><span class="muted">Report inbox</span><select id="adminReportFilter" aria-label="Filter reports by status"><option value="All">All reports</option><option>Submitted</option><option>Under Review</option><option>In Progress</option><option>Resolved</option><option>Rejected</option></select></div>
+          <div id="adminReportsList" class="admin-reports-list"><p class="muted">Loading reports…</p></div>
+        </section>
+        <section class="cta"><div><small>READY TO EXPLORE?</small><h2>Start finding your way around CICS.</h2></div><button class="btn white" data-page="map">Open Building Map →</button></section>
+      </section>
+
+      <section id="rulesPage" class="page hidden rules-page">
+        <div class="directory-title-row"><div><small class="eyebrow">CICS BUILDING GUIDE</small><h1>Room Rules</h1><p class="muted">Guidelines for using classrooms, laboratories, offices, and shared spaces.</p></div><button class="btn outline" data-page="home" type="button">← Back to Home</button></div>
+        <div class="rules-empty-state"><span class="rules-empty-icon">▣</span><h2>Room rules will appear here</h2><p>The official room rules have not been added yet. This page is ready for the guidelines you will provide.</p></div>
+      </section>
+
+      <section id="directoryPage" class="page hidden destination-directory-page">
+        <div class="directory-title-row"><div><small class="eyebrow">QUICK ACCESS DIRECTORY</small><h1 id="directoryHeading">Where do you need to go?</h1><p id="directorySubtitle" class="muted">Search destinations across the CICS Building.</p></div><button class="btn outline" data-page="home" type="button">← Back to Home</button></div>
+        <div class="directory-search"><span>⌕</span><input id="directorySearch" type="search" placeholder="Search room, laboratory, or office..." aria-label="Search destinations"></div>
+        <div id="directoryFilters" class="directory-filters" aria-label="Destination categories">
+          <button type="button" class="directory-filter active" data-category="All">All</button><button type="button" class="directory-filter" data-category="Classrooms">Classrooms</button><button type="button" class="directory-filter" data-category="Laboratories">Laboratories</button><button type="button" class="directory-filter" data-category="Offices">Offices</button><button type="button" class="directory-filter" data-category="Facilities">Facilities</button>
+        </div>
+        <div class="directory-results-heading"><b id="directoryResultsLabel">All destinations</b><span id="directoryCount">0 results</span></div>
+        <div id="directoryResults" class="directory-results"><p class="muted">Loading destinations…</p></div>
+      </section>
+
+      <section id="mapPage" class="page hidden map-page">
+        <div class="map-page-heading"><div><small class="eyebrow">CICS BUILDING DIRECTORY</small><h1>Building Map</h1><p class="muted">Select a floor and tap any room to view its location.</p></div><div class="map-search-box"><input id="mapSearch" placeholder="⌕  Search room, laboratory, or office..."><button class="btn outline" id="clearSearch" type="button">Clear</button></div></div>
+        <div class="map-layout">
+          <aside class="floor-sidebar"><b class="sidebar-heading">⌁ &nbsp; SELECT A FLOOR</b><div id="floorList"></div><hr><small class="muted legend-heading">MAP LEGEND</small><p><i class="legend-swatch classroom"></i> Classroom</p><p><i class="legend-swatch lab"></i> Laboratory</p><p><i class="legend-swatch office"></i> Office</p><p><i class="legend-swatch facility"></i> Facility</p></aside>
+          <div class="map-content">
+            <div class="map-label"><small class="eyebrow" id="floorEyebrow">1ST FLOOR PLAN</small><h2 id="floorHeading">Select a floor</h2><span class="map-hint">ⓘ &nbsp;Tap a room to select it</span></div>
+            <div class="building-map-shell"><div id="roomGrid" class="room-grid" aria-label="Selected floor plan"></div></div>
+            <div id="roomDetails" class="room-details"><div class="location-banner"><span class="destination-pin">⌖</span><b>DESTINATION SELECTED</b></div><div class="room-details-content"><div><small class="detail-type">DESTINATION</small><h3>Select a room</h3><p class="muted">Choose a room on the floor plan to see its details.</p></div><div class="navigation-guide"><b>⌖ &nbsp; Navigation guide</b><p>Select a room to see its floor and location in the CICS Building.</p></div></div></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="reportPage" class="page hidden">
+        <div class="report-layout"><div class="report-intro"><small class="eyebrow">TROUBLESHOOTING</small><h1>Report a<br>Problem</h1><p>Found a technical or facility issue? Send us the details and we'll route it to the right team.</p><div class="info-callout">ⓘ <b>Your report helps improve CICS.</b><br>Submit clear information so personnel can review your concern.</div><ol><li>Submit your report</li><li>Technical team reviews it</li><li>Track your report status</li></ol></div>
+          <form id="reportForm" class="card report-card"><h2>▤ Problem details</h2><p class="muted">Please provide details about the issue.</p>
+            <div class="two-col"><label>Building<select name="building_id" id="reportBuilding"><option value="">Select building</option></select></label><label>Problem category<select name="category" required><option value="">Select a category</option><option>Facility</option><option>Electrical</option><option>Internet / Network</option><option>Computer / Equipment</option><option>Cleanliness</option><option>Other</option></select></label></div>
+            <div class="two-col"><label>Room<select name="room_id" id="reportRoom"><option value="">Select a room</option></select></label><label>Priority<select name="priority"><option>Low</option><option selected>Medium</option><option>High</option><option>Urgent</option></select></label></div>
+            <label>Problem title<input name="title" required placeholder="Briefly describe the issue"></label>
+            <label>Description<textarea name="description" required rows="4" placeholder="What happened? Where did it happen?"></textarea></label>
+            <label>Upload image (optional)<input type="file" name="image" accept="image/png,image/jpeg,image/webp,image/gif"></label>
+            <div class="two-col"><label>Name<input name="contact_name" placeholder="Your name"></label><label>Contact email<input name="contact_email" type="email" placeholder="you@example.com"></label></div>
+            <button class="btn primary" type="submit">Submit Report →</button><p id="reportMessage" class="message"></p>
+          </form>
+        </div>
+        <section class="history-section"><h2>My submitted reports</h2><div id="reportHistory"></div></section>
+      </section>
+
+      <section id="aboutPage" class="page hidden">
+        <div class="about-hero"><small class="eyebrow">ABOUT THE PLATFORM</small><h1>Finding your way<br>should feel <span>simple.</span></h1><p>Built for the CICS community at Batangas State University · Alangilan Campus.</p><div class="about-logo">⌖ Findr<small>YOUR CICS BUILDING GUIDE</small></div></div>
+        <blockquote>“Findr is a web-based building navigation and troubleshooting platform developed to help students, faculty, and visitors easily locate rooms and facilities inside the CICS Building. It also provides a convenient way to report technical and facility-related problems, helping the responsible personnel monitor and address reported concerns.”</blockquote>
+        <div class="feature-grid"><article><b>⌖ Navigate with ease</b><p>Find room locations and explore building floors.</p></article><article><b>△ Report with confidence</b><p>Submit facility concerns and track their status.</p></article><article><b>♧ Built for everyone</b><p>Designed for students, faculty, and visitors.</p></article></div>
+      </section>
+    </main>
+    <footer><div class="footer-brand">⌖ Findr <small>CICS BUILDING GUIDE</small><p>Your guide to the College of Informatics and Computing Sciences.</p></div><div><b>QUICK LINKS</b><button data-page="home">Home</button><button data-page="map">Building Map</button><button data-page="report">Report a Problem</button></div><div><b>INFORMATION</b><button data-page="about">About</button><span>Batangas State University</span></div></footer>
+  </div>
+  <div id="toast" class="toast" role="status"></div>
+  <script src="js/app.js"></script>
+</body>
+</html>
