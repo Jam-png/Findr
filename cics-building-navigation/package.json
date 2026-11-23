@@ -2,7 +2,9 @@
   "name": "findr-cics-building-navigation",
   "version": "2.0.0",
   "private": true,
-  "engines": { "node": ">=22" },
+  "engines": {
+  "node": "22.x"
+},
   "description": "Findr CICS Building Navigation and Reporting System using Supabase PostgreSQL and Storage",
   "main": "index.js",
   "scripts": {
