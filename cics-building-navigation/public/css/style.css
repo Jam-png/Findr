@@ -254,3 +254,17 @@ footer{background:#061d36;color:#dce9f3;padding:40px max(5%,calc((100% - 1240px)
 .priority-pill.low{background:#edf8f1;color:#27804f}
 @media(max-width:760px){.directory-title-row{align-items:flex-start;flex-direction:column}.directory-results{grid-template-columns:1fr}.admin-report-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-section-heading{align-items:flex-start;flex-direction:column}}
 @media(max-width:520px){.directory-title-row h1{font-size:30px}.directory-filters{justify-content:flex-start}.directory-filter{padding:8px 12px}.admin-report-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-report-toolbar{align-items:flex-start;gap:10px;flex-direction:column}}
+
+
+/* Password visibility and account recovery */
+.password-wrap { position: relative; }
+.password-wrap input { min-width: 0; padding-right: 8px; }
+.password-wrap .show-password {
+  flex: 0 0 42px; display: grid; place-items: center; padding: 8px;
+  color: #64748b; border-radius: 0 8px 8px 0;
+}
+.password-wrap .show-password:hover { color: var(--blue); background: #f4f8fc; }
+.show-password svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+#forgotPanel { display: grid; gap: 14px; }
+#forgotPanel .form-card { margin-top: 2px; }
+#forgotPanel .center { margin-top: 5px; }
