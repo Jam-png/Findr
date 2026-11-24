@@ -21,7 +21,7 @@
         <div class="tabs"><button class="tab active" data-role="student">Student Login</button><button class="tab" data-role="admin">Admin Login</button></div>
         <form id="loginForm" class="card form-card">
           <label>Username or email<input name="identifier" required placeholder="Enter your email or username"></label>
-          <label>Password<div class="password-wrap"><input name="password" type="password" required minlength="8" placeholder="At least 8 characters"><button type="button" class="show-password">SHOW</button></div></label>
+          <label>Password<div class="password-wrap"><input name="password" type="password" required minlength="8" placeholder="At least 8 characters"><button type="button" class="show-password" aria-label="Show password" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></button></div></label>
           <div class="right"><a href="#" id="forgotLink">Forgot Password?</a></div>
           <button class="btn primary full" type="submit">Login as Student</button>
           <p id="loginMessage" class="message"></p>
@@ -34,12 +34,33 @@
         <form id="registerForm" class="card form-card">
           <div class="two-col"><label>Full name<input name="full_name" required placeholder="Your full name"></label><label>Username<input name="username" required placeholder="Choose username"></label></div>
           <label>Email address<input name="email" type="email" required placeholder="you@example.com"></label>
-          <div class="two-col"><label>Password<input name="password" type="password" minlength="8" required placeholder="At least 8 characters"></label><label>Confirm password<input name="confirm_password" type="password" required placeholder="Repeat password"></label></div>
+          <div class="two-col"><label>Password<div class="password-wrap"><input name="password" type="password" minlength="8" required placeholder="At least 8 characters"><button type="button" class="show-password" aria-label="Show password" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></button></div></label><label>Confirm password<div class="password-wrap"><input name="confirm_password" type="password" required placeholder="Repeat password"><button type="button" class="show-password" aria-label="Show password" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></button></div></label></div>
           <label>Account type<select name="role" id="registerRole"><option value="student">Student</option><option value="admin">Administrator</option></select></label>
           <label id="adminCodeWrap" class="hidden">Admin registration code<input name="admin_code" placeholder="Enter authorized code"></label>
           <button class="btn primary full" type="submit">Create Account</button><p id="registerMessage" class="message"></p>
         </form>
         <p class="center muted">Already have an account? <a href="#" id="showLogin">Student login</a></p>
+      </section>
+      <section id="forgotPanel" class="auth-card-wrap hidden">
+        <small class="eyebrow">ACCOUNT RECOVERY</small><h2>Reset your password</h2>
+        <p class="muted">We’ll send a 6-digit verification code to the email address connected to your Findr account.</p>
+        <form id="forgotForm" class="card form-card">
+          <label>Email address<input name="email" type="email" required placeholder="Enter your registered email"></label>
+          <button class="btn primary full" type="submit">Send verification code</button>
+          <p id="forgotMessage" class="message" aria-live="polite"></p>
+        </form>
+        <form id="verifyResetForm" class="card form-card hidden">
+          <label>6-digit verification code<input name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required placeholder="Enter code from your email"></label>
+          <button class="btn primary full" type="submit">Verify code</button>
+          <p id="verifyResetMessage" class="message" aria-live="polite"></p>
+        </form>
+        <form id="newPasswordForm" class="card form-card hidden">
+          <label>New password<div class="password-wrap"><input name="password" type="password" minlength="8" required placeholder="At least 8 characters"><button type="button" class="show-password" aria-label="Show password" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></button></div></label>
+          <label>Confirm new password<div class="password-wrap"><input name="confirm_password" type="password" required placeholder="Re-enter your new password"><button type="button" class="show-password" aria-label="Show password" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7S2 19 12 19 2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></button></div></label>
+          <button class="btn primary full" type="submit">Reset password</button>
+          <p id="newPasswordMessage" class="message" aria-live="polite"></p>
+        </form>
+        <p class="center muted">Remembered your password? <a href="#" id="backToLogin">Back to login</a></p>
       </section>
     </main>
   </div>
