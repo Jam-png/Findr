@@ -15,6 +15,7 @@ function message(el, text, success=false) { el.textContent=text; el.classList.to
 function showAuth(register=false) {
   $('#authView').classList.remove('hidden'); $('#appView').classList.add('hidden');
   $('#loginPanel').classList.toggle('hidden',register); $('#registerPanel').classList.toggle('hidden',!register);
+  $('#forgotPanel').classList.add('hidden');
 }
 function showApp() {
   $('#authView').classList.add('hidden'); $('#appView').classList.remove('hidden');
@@ -57,14 +58,61 @@ $$('.tab').forEach(b=>b.addEventListener('click',()=>{
   $('#loginHeading').textContent=selectedRole==='admin'?'Admin Login':'Student Login';
   $('#loginForm button[type=submit]').textContent=selectedRole==='admin'?'Login as Administrator':'Login as Student';
 }));
-$('.show-password').addEventListener('click',e=>{
-  const input=$('#loginForm [name=password]'); input.type=input.type==='password'?'text':'password';
-  e.target.textContent=input.type==='password'?'SHOW':'HIDE';
+document.addEventListener('click',e=>{
+  const toggle=e.target.closest('.show-password');
+  if(!toggle) return;
+  const input=toggle.parentElement.querySelector('input');
+  const visible=input.type==='password';
+  input.type=visible?'text':'password';
+  toggle.setAttribute('aria-label',visible?'Hide password':'Show password');
+  toggle.setAttribute('aria-pressed',String(visible));
+  toggle.innerHTML=visible
+    ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18M10.6 10.6a2 2 0 0 0 2.8 2.8"/><path d="M9.9 5.2A10.8 10.8 0 0 1 12 5c6.4 0 10 7 10 7a16 16 0 0 1-3.1 3.8M6.2 6.2C3.5 8 2 12 2 12s3.6 7 10 7a10 10 0 0 0 3-.5"/></svg>'
+    : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>';
 });
 $('#showRegister').addEventListener('click',e=>{e.preventDefault();showAuth(true)});
 $('#showLogin').addEventListener('click',e=>{e.preventDefault();showAuth(false)});
 $('#registerRole').addEventListener('change',e=>$('#adminCodeWrap').classList.toggle('hidden',e.target.value!=='admin'));
-$('#forgotLink').addEventListener('click',e=>{e.preventDefault();toast('Please contact your CICS administrator to reset your password.');});
+let resetEmail = '';
+$('#forgotLink').addEventListener('click',e=>{
+  e.preventDefault();
+  $('#loginPanel').classList.add('hidden'); $('#registerPanel').classList.add('hidden');
+  $('#forgotPanel').classList.remove('hidden');
+  $('#forgotForm').classList.remove('hidden'); $('#verifyResetForm').classList.add('hidden'); $('#newPasswordForm').classList.add('hidden');
+  $('#forgotMessage').textContent='';
+});
+$('#backToLogin').addEventListener('click',e=>{e.preventDefault();showAuth(false)});
+$('#forgotForm').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const email=new FormData(e.target).get('email').trim().toLowerCase();
+  try {
+    const data=await api('/api/auth/forgot-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})});
+    resetEmail=email;
+    message($('#forgotMessage'),data.message,true);
+    $('#verifyResetForm').classList.remove('hidden');
+  } catch(err){message($('#forgotMessage'),err.message);}
+});
+$('#verifyResetForm').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const code=String(new FormData(e.target).get('code')).trim();
+  try {
+    const data=await api('/api/auth/verify-reset-code',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:resetEmail,code})});
+    message($('#verifyResetMessage'),data.message,true);
+    $('#newPasswordForm').classList.remove('hidden');
+  } catch(err){message($('#verifyResetMessage'),err.message);}
+});
+$('#newPasswordForm').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const form=new FormData(e.target);
+  if(form.get('password')!==form.get('confirm_password'))
+    return message($('#newPasswordMessage'),'Passwords do not match.');
+  try {
+    const data=await api('/api/auth/reset-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:resetEmail,code:$('#verifyResetForm [name=code]').value.trim(),password:form.get('password')})});
+    message($('#newPasswordMessage'),data.message,true);
+    e.target.reset();
+    setTimeout(()=>showAuth(false),1200);
+  } catch(err){message($('#newPasswordMessage'),err.message);}
+});
 $('#menuToggle').addEventListener('click',()=>$('#mainNav').classList.toggle('open'));
 
 $('#loginForm').addEventListener('submit',async e=>{
@@ -80,7 +128,11 @@ $('#registerForm').addEventListener('submit',async e=>{
   const body=Object.fromEntries(f.entries()); delete body.confirm_password;
   try {
     const data=await api('/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-    message($('#registerMessage'),data.message,true); e.target.reset(); $('#adminCodeWrap').classList.add('hidden');
+    const emailNote = data.notification === 'sent'
+      ? ' A confirmation email has been sent.'
+      : ' Email delivery is not configured or is temporarily unavailable; please check the Resend settings.';
+    message($('#registerMessage'),data.message + emailNote,true);
+    e.target.reset(); $('#adminCodeWrap').classList.add('hidden');
   } catch(err){message($('#registerMessage'),err.message);}
 });
 $('#logoutBtn').addEventListener('click',async()=>{
