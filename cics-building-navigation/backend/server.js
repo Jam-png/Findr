@@ -4,6 +4,7 @@ const express = require('express');
 const multer = require('multer');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
+const bcrypt = require('bcryptjs');
 const db = require('./db');
 
 const { createClient } = require('@supabase/supabase-js');
