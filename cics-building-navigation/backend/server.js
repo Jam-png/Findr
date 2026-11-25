@@ -1,30 +1,48 @@
 require('dotenv').config();
 const express = require('express');
-const cookieParser = require('cookie-parser');
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
+
 const multer = require('multer');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
 const db = require('./db');
-const { sendFindrEmail, sendReportNotification } = require('./email');
+
+const { createClient } = require('@supabase/supabase-js');
+
+const authClient = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_ANON_KEY,
+  {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false
+    }
+  }
+);
+
+const { sendReportNotification } = require('./email');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET || (process.env.NODE_ENV === 'production' ? '' : 'local-development-secret-change-before-deploying');
 const ADMIN_REGISTRATION_CODE = process.env.ADMIN_REGISTRATION_CODE || '';
 const STORAGE_BUCKET = process.env.SUPABASE_STORAGE_BUCKET || 'report-images';
-const TOKEN_COOKIE = 'findr_token';
-const TOKEN_LIFETIME_SECONDS = 8 * 60 * 60;
-
-if (!JWT_SECRET || JWT_SECRET.length < 32) {
-  throw new Error('JWT_SECRET must be set to a random value of at least 32 characters.');
-}
 
 app.set('trust proxy', 1);
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
-app.use(cookieParser());
+
+app.get('/api/config', (_req, res) => {
+  if (!process.env.SUPABASE_ANON_KEY) {
+    return res.status(503).json({
+      error: 'Supabase Auth is not configured.'
+    });
+  }
+
+  res.json({
+    supabaseUrl: process.env.SUPABASE_URL,
+    supabaseAnonKey: process.env.SUPABASE_ANON_KEY
+  });
+});
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -51,28 +69,19 @@ const publicUser = user => ({
   role: user.role
 });
 
-function sendCookie(res, user) {
-  const token = jwt.sign({ sub: String(user.id) }, JWT_SECRET, { expiresIn: TOKEN_LIFETIME_SECONDS });
-  res.cookie(TOKEN_COOKIE, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    maxAge: TOKEN_LIFETIME_SECONDS * 1000,
-    path: '/'
-  });
-}
-
 async function attachUser(req, _res, next) {
   try {
-    const token = req.cookies[TOKEN_COOKIE];
+    const header = req.headers.authorization || '';
+    const token = header.startsWith('Bearer ') ? header.slice(7) : '';
     if (!token) { req.user = null; return next(); }
-    const decoded = jwt.verify(token, JWT_SECRET);
-    const { data, error } = await db.from('users')
-      .select('id,full_name,username,email,role')
-      .eq('id', decoded.sub)
+    const { data: authData, error: authError } = await db.auth.getUser(token);
+    if (authError || !authData?.user) { req.user = null; return next(); }
+    const { data: profile, error } = await db.from('users')
+      .select('id,auth_user_id,full_name,username,email,role')
+      .eq('auth_user_id', authData.user.id)
       .maybeSingle();
     if (error) throw error;
-    req.user = data || null;
+    req.user = profile || null;
     next();
   } catch (_error) {
     req.user = null;
@@ -102,6 +111,13 @@ function optionalId(value) {
 app.use(express.static(path.join(__dirname, '..', 'public')));
 app.use(attachUser);
 
+app.get('/api/config', (_req, res) => {
+  res.json({
+    supabaseUrl: process.env.SUPABASE_URL,
+    supabaseAnonKey: process.env.SUPABASE_ANON_KEY
+  });
+});
+
 app.get('/api/health', async (_req, res) => {
   try {
     const { error } = await db.from('buildings').select('id', { head: true, count: 'exact' });
@@ -121,79 +137,88 @@ app.get('/api/integrations/status', requireAuth, requireAdmin, async (_req, res,
     res.json({
       database: 'connected',
       imageStorage: STORAGE_BUCKET,
-      emailNotifications: process.env.RESEND_API_KEY && process.env.EMAIL_FROM ? 'configured' : 'not configured'
+      emailNotifications: 'Supabase Auth email recovery (configure in Supabase)'
     });
   } catch (error) { next(error); }
 });
 
-// Authentication
+// Authentication: passwords and sessions are managed by Supabase Auth.
+// The service-role client is server-only and is never sent to the browser.
 app.post('/api/auth/register', authLimiter, async (req, res, next) => {
+  let authUserId = null;
   try {
     const { full_name, username, email, password, role = 'student', admin_code } = req.body;
-    if (!full_name || !username || !email || !password)
-      return res.status(400).json({ error: 'Please complete all required fields.' });
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
-      return res.status(400).json({ error: 'Enter a valid email address.' });
-    if (String(password).length < 8)
-      return res.status(400).json({ error: 'Password must contain at least 8 characters.' });
-    if (!['student', 'admin'].includes(role))
-      return res.status(400).json({ error: 'Invalid account type.' });
-    if (role === 'admin' && (!ADMIN_REGISTRATION_CODE || admin_code !== ADMIN_REGISTRATION_CODE))
-      return res.status(403).json({ error: 'Invalid administrator registration code.' });
+    if (!full_name || !username || !email || !password) return res.status(400).json({ error: 'Please complete all required fields.' });
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Enter a valid email address.' });
+    if (String(password).length < 8) return res.status(400).json({ error: 'Password must contain at least 8 characters.' });
+    if (!['student', 'admin'].includes(role)) return res.status(400).json({ error: 'Invalid account type.' });
+    if (role === 'admin' && (!ADMIN_REGISTRATION_CODE || admin_code !== ADMIN_REGISTRATION_CODE)) return res.status(403).json({ error: 'Invalid administrator registration code.' });
 
-    const password_hash = await bcrypt.hash(password, 12);
     const cleanEmail = String(email).trim().toLowerCase();
-    const data = failIfError(await db.from('users').insert({
-      full_name: String(full_name).trim(),
-      username: String(username).trim(),
-      email: cleanEmail,
-      password_hash,
-      role
-    }).select('id,full_name,email,role').single());
-
-    // Registration is immediate; no email verification or Resend delivery is required.
-    res.status(201).json({
-      message: 'Account created successfully. You can now log in.',
-      id: data.id
+    const created = await db.auth.admin.createUser({
+      email: cleanEmail, password: String(password), email_confirm: true,
+      user_metadata: { full_name: String(full_name).trim(), username: String(username).trim() }
     });
+    if (created.error) throw created.error;
+    authUserId = created.data.user.id;
+
+    const password_hash = await bcrypt.hash(password, 12); // temporary legacy compatibility only
+    const profile = await db.from('users').insert({
+      full_name: String(full_name).trim(), username: String(username).trim(), email: cleanEmail,
+      password_hash, role, auth_user_id: authUserId
+    }).select('id').single();
+    if (profile.error) throw profile.error;
+    res.status(201).json({ message: 'Account created successfully. You can now log in.', id: profile.data.id });
   } catch (error) {
+    if (authUserId) await db.auth.admin.deleteUser(authUserId).catch(() => {});
     if (error.code === '23505') return res.status(409).json({ error: 'Username or email already exists.' });
     next(error);
   }
 });
 
-// Email-based password recovery is currently unavailable because no email
-// delivery provider is configured. Never reset a password based only on an
-// email address; that would allow anyone to take over another user's account.
-app.post('/api/auth/forgot-password', authLimiter, (_req, res) => {
-  res.status(503).json({
-    error: 'Password recovery by email is temporarily unavailable. Please contact the Findr administrator for assistance.'
-  });
-});
-
 app.post('/api/auth/login', authLimiter, async (req, res, next) => {
   try {
     const { identifier, password, role } = req.body;
-    if (!identifier || !password || !['student', 'admin'].includes(role))
-      return res.status(400).json({ error: 'Enter your login details and account type.' });
+    if (!identifier || !password || !['student', 'admin'].includes(role)) return res.status(400).json({ error: 'Enter your login details and account type.' });
 
-    let user = failIfError(await db.from('users').select('*').eq('username', String(identifier).trim()).eq('role', role).maybeSingle());
-    if (!user) user = failIfError(await db.from('users').select('*').eq('email', String(identifier).trim().toLowerCase()).eq('role', role).maybeSingle());
-    if (!user || !(await bcrypt.compare(password, user.password_hash)))
-      return res.status(401).json({ error: 'Incorrect login details or account type.' });
+    const value = String(identifier).trim();
+    let profile = await db.from('users').select('*').eq('username', value).eq('role', role).maybeSingle();
+    if (profile.error) throw profile.error;
+    if (!profile.data) profile = await db.from('users').select('*').eq('email', value.toLowerCase()).eq('role', role).maybeSingle();
+    if (profile.error) throw profile.error;
+    let user = profile.data;
+    if (!user) return res.status(401).json({ error: 'Incorrect login details or account type.' });
 
+    // If this is a legacy record, verify its existing bcrypt password, then create/link its Auth identity.
+    if (!user.auth_user_id) {
+      if (!(await bcrypt.compare(String(password), user.password_hash))) return res.status(401).json({ error: 'Incorrect login details or account type.' });
+      const created = await db.auth.admin.createUser({
+        email: user.email, password: String(password), email_confirm: true,
+        user_metadata: { full_name: user.full_name, username: user.username }
+      });
+      if (created.error) throw created.error;
+      const linked = await db.from('users').update({ auth_user_id: created.data.user.id }).eq('id', user.id).select('*').single();
+      if (linked.error) { await db.auth.admin.deleteUser(created.data.user.id).catch(() => {}); throw linked.error; }
+      user = linked.data;
+    } else {
+      const signedIn = await authClient.auth.signInWithPassword({ email: user.email, password: String(password) });
+      if (signedIn.error) return res.status(401).json({ error: 'Incorrect login details or account type.' });
+      if (signedIn.data.user.id !== user.auth_user_id) return res.status(401).json({ error: 'This account is not linked correctly. Contact the Findr administrator.' });
+    }
+
+    // Confirm the newly migrated identity can authenticate before issuing the app cookie.
+    if (!user.auth_user_id) return res.status(500).json({ error: 'Unable to link this account to Supabase Auth.' });
+    if (user.auth_user_id && !profile.data.auth_user_id) {
+      const check = await authClient.auth.signInWithPassword({ email: user.email, password: String(password) });
+      if (check.error || check.data.user.id !== user.auth_user_id) return res.status(401).json({ error: 'Unable to verify the migrated account.' });
+    }
     sendCookie(res, user);
     res.json({ message: 'Login successful.', user: publicUser(user) });
   } catch (error) { next(error); }
 });
 
 app.post('/api/auth/logout', (_req, res) => {
-  res.clearCookie(TOKEN_COOKIE, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    path: '/'
-  });
+  // Supabase session is cleared by the browser SDK; this endpoint remains for compatibility.
   res.json({ message: 'Logged out.' });
 });
 app.get('/api/auth/me', (req, res) => res.json({ user: req.user ? publicUser(req.user) : null }));
