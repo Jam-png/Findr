@@ -6,7 +6,6 @@ const bcrypt = require('bcryptjs');
 const multer = require('multer');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
-const crypto = require('crypto');
 const db = require('./db');
 const { sendFindrEmail, sendReportNotification } = require('./email');
 
@@ -152,17 +151,10 @@ app.post('/api/auth/register', authLimiter, async (req, res, next) => {
       role
     }).select('id,full_name,email,role').single());
 
-    const emailResult = await sendFindrEmail({
-      to: cleanEmail,
-      subject: 'Your Findr account has been created',
-      heading: 'Welcome to Findr!',
-      message: `Hello ${data.full_name}, your ${data.role} account has been successfully created.`,
-      details: 'You can now log in to Findr using your registered username or email address.'
-    });
+    // Registration is immediate; no email verification or Resend delivery is required.
     res.status(201).json({
-      message: 'Account created successfully. Please check your email for confirmation.',
-      id: data.id,
-      notification: emailResult.sent ? 'sent' : emailResult.reason
+      message: 'Account created successfully. You can now log in.',
+      id: data.id
     });
   } catch (error) {
     if (error.code === '23505') return res.status(409).json({ error: 'Username or email already exists.' });
@@ -170,122 +162,13 @@ app.post('/api/auth/register', authLimiter, async (req, res, next) => {
   }
 });
 
-// Password recovery uses a short-lived, single-use email code.
-// The database stores only a SHA-256 hash of the code, never the code itself.
-function hashResetCode(code) {
-  return crypto.createHash('sha256').update(`${JWT_SECRET}:${code}`).digest('hex');
-}
-
-app.post('/api/auth/forgot-password', authLimiter, async (req, res, next) => {
-  try {
-    const email = String(req.body.email || '').trim().toLowerCase();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
-      return res.status(400).json({ error: 'Enter a valid email address.' });
-
-    const user = failIfError(await db.from('users')
-      .select('id,full_name,email')
-      .eq('email', email)
-      .maybeSingle());
-
-    // Use the same response whether or not the address exists to avoid account discovery.
-    if (!user) return res.json({ message: 'If an account uses that email, a verification code has been sent.' });
-
-    // Invalidate older outstanding codes before issuing a new one.
-    failIfError(await db.from('password_reset_codes')
-      .update({ used_at: new Date().toISOString() })
-      .eq('user_id', user.id)
-      .is('used_at', null));
-
-    const code = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
-    failIfError(await db.from('password_reset_codes').insert({
-      user_id: user.id,
-      code_hash: hashResetCode(code),
-      expires_at: expiresAt
-    }));
-
-    const emailResult = await sendFindrEmail({
-      to: user.email,
-      subject: 'Your Findr password reset code',
-      heading: 'Password reset verification',
-      message: `Hello ${user.full_name}, use the verification code below to reset your Findr password.`,
-      details: `${code}\n\nThis code expires in 10 minutes and can only be used once. If you did not request a password reset, you can ignore this email.`
-    });
-
-    if (!emailResult.sent) {
-      // Do not leave a valid code behind when the email could not be delivered.
-      await db.from('password_reset_codes')
-        .update({ used_at: new Date().toISOString() })
-        .eq('user_id', user.id)
-        .is('used_at', null);
-      return res.status(503).json({ error: 'We could not send the verification email. Please try again later.' });
-    }
-
-    res.json({ message: 'If an account uses that email, a verification code has been sent.' });
-  } catch (error) { next(error); }
-});
-
-app.post('/api/auth/verify-reset-code', authLimiter, async (req, res, next) => {
-  try {
-    const email = String(req.body.email || '').trim().toLowerCase();
-    const code = String(req.body.code || '').trim();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !/^\d{6}$/.test(code))
-      return res.status(400).json({ error: 'Enter the email address and 6-digit code.' });
-
-    const user = failIfError(await db.from('users').select('id').eq('email', email).maybeSingle());
-    if (!user) return res.status(400).json({ error: 'The verification code is invalid or expired.' });
-
-    const reset = failIfError(await db.from('password_reset_codes')
-      .select('id,code_hash,expires_at,used_at')
-      .eq('user_id', user.id)
-      .is('used_at', null)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle());
-
-    if (!reset || new Date(reset.expires_at).getTime() <= Date.now() ||
-        !crypto.timingSafeEqual(Buffer.from(reset.code_hash, 'hex'), Buffer.from(hashResetCode(code), 'hex'))) {
-      return res.status(400).json({ error: 'The verification code is invalid or expired.' });
-    }
-
-    res.json({ message: 'Email verified. You can now choose a new password.' });
-  } catch (error) { next(error); }
-});
-
-app.post('/api/auth/reset-password', authLimiter, async (req, res, next) => {
-  try {
-    const email = String(req.body.email || '').trim().toLowerCase();
-    const code = String(req.body.code || '').trim();
-    const password = String(req.body.password || '');
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !/^\d{6}$/.test(code))
-      return res.status(400).json({ error: 'Complete the email and verification code fields.' });
-    if (password.length < 8)
-      return res.status(400).json({ error: 'Password must contain at least 8 characters.' });
-
-    const user = failIfError(await db.from('users').select('id').eq('email', email).maybeSingle());
-    if (!user) return res.status(400).json({ error: 'The verification code is invalid or expired.' });
-
-    const reset = failIfError(await db.from('password_reset_codes')
-      .select('id,code_hash,expires_at,used_at')
-      .eq('user_id', user.id)
-      .is('used_at', null)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle());
-
-    if (!reset || new Date(reset.expires_at).getTime() <= Date.now() ||
-        !crypto.timingSafeEqual(Buffer.from(reset.code_hash, 'hex'), Buffer.from(hashResetCode(code), 'hex'))) {
-      return res.status(400).json({ error: 'The verification code is invalid or expired.' });
-    }
-
-    const password_hash = await bcrypt.hash(password, 12);
-    failIfError(await db.from('users').update({ password_hash }).eq('id', user.id));
-    failIfError(await db.from('password_reset_codes')
-      .update({ used_at: new Date().toISOString() })
-      .eq('id', reset.id));
-
-    res.json({ message: 'Your password has been reset. You can now log in.' });
-  } catch (error) { next(error); }
+// Email-based password recovery is currently unavailable because no email
+// delivery provider is configured. Never reset a password based only on an
+// email address; that would allow anyone to take over another user's account.
+app.post('/api/auth/forgot-password', authLimiter, (_req, res) => {
+  res.status(503).json({
+    error: 'Password recovery by email is temporarily unavailable. Please contact the Findr administrator for assistance.'
+  });
 });
 
 app.post('/api/auth/login', authLimiter, async (req, res, next) => {
