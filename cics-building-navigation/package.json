@@ -2,15 +2,14 @@
   "name": "findr-cics-building-navigation",
   "version": "2.0.0",
   "private": true,
-  "engines": {
-  "node": "22.x"
-},
+  "engines": { "node": "22.x" },
   "description": "Findr CICS Building Navigation and Reporting System using Supabase PostgreSQL and Storage",
   "main": "index.js",
   "scripts": {
     "start": "node backend/server.js",
     "dev": "nodemon backend/server.js",
-    "check": "node --check index.js && node --check backend/server.js && node --check backend/db.js && node --check public/js/app.js"
+    "migrate:auth": "node scripts/migrate-auth-users.js",
+    "check": "node --check backend/server.js && node --check backend/db.js && node --check backend/migrate-auth-users.js && node --check public/js/app.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.0",
@@ -22,7 +21,5 @@
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.0.2"
   },
-  "devDependencies": {
-    "nodemon": "^3.1.7"
-  }
+  "devDependencies": { "nodemon": "^3.1.7" }
 }
