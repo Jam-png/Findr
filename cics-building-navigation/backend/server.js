@@ -240,8 +240,18 @@ authSession = signedIn.data.session;
 
   authSession = check.data.session;
 }
-    sendCookie(res, user);
-    res.json({ message: 'Login successful.', user: publicUser(user) });
+    if (!authSession) {
+  return res.status(500).json({
+    error: 'Unable to create a login session.'
+  });
+}
+
+res.json({
+  message: 'Login successful.',
+  user: publicUser(user),
+  access_token: authSession.access_token,
+  refresh_token: authSession.refresh_token
+});
   } catch (error) { next(error); }
 });
 
