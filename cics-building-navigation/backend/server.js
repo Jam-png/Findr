@@ -1,6 +1,5 @@
 require('dotenv').config();
 const express = require('express');
-const bcrypt = require('bcryptjs');
 
 const multer = require('multer');
 const rateLimit = require('express-rate-limit');
