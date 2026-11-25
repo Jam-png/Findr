@@ -203,9 +203,22 @@ app.post('/api/auth/login', authLimiter, async (req, res, next) => {
       if (linked.error) { await db.auth.admin.deleteUser(created.data.user.id).catch(() => {}); throw linked.error; }
       user = linked.data;
     } else {
-      const signedIn = await authClient.auth.signInWithPassword({ email: user.email, password: String(password) });
-      if (signedIn.error) return res.status(401).json({ error: 'Incorrect login details or account type.' });
-      if (signedIn.data.user.id !== user.auth_user_id) return res.status(401).json({ error: 'This account is not linked correctly. Contact the Findr administrator.' });
+      const signedIn = await authClient.auth.signInWithPassword({
+  email: user.email,
+  password: String(password)
+});
+
+if (signedIn.error) {
+  return res.status(401).json({ error: 'Incorrect login details or account type.' });
+}
+
+if (signedIn.data.user.id !== user.auth_user_id) {
+  return res.status(401).json({
+    error: 'This account is not linked correctly. Contact the Findr administrator.'
+  });
+}
+
+authSession = signedIn.data.session;
     }
 
     // Confirm the newly migrated identity can authenticate before issuing the app cookie.
