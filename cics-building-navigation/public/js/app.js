@@ -73,46 +73,24 @@ document.addEventListener('click',e=>{
 $('#showRegister').addEventListener('click',e=>{e.preventDefault();showAuth(true)});
 $('#showLogin').addEventListener('click',e=>{e.preventDefault();showAuth(false)});
 $('#registerRole').addEventListener('change',e=>$('#adminCodeWrap').classList.toggle('hidden',e.target.value!=='admin'));
-let resetEmail = '';
 $('#forgotLink').addEventListener('click',e=>{
   e.preventDefault();
   $('#loginPanel').classList.add('hidden'); $('#registerPanel').classList.add('hidden');
   $('#forgotPanel').classList.remove('hidden');
-  $('#forgotForm').classList.remove('hidden'); $('#verifyResetForm').classList.add('hidden'); $('#newPasswordForm').classList.add('hidden');
   $('#forgotMessage').textContent='';
 });
 $('#backToLogin').addEventListener('click',e=>{e.preventDefault();showAuth(false)});
+
 $('#forgotForm').addEventListener('submit',async e=>{
   e.preventDefault();
   const email=new FormData(e.target).get('email').trim().toLowerCase();
   try {
-    const data=await api('/api/auth/forgot-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})});
-    resetEmail=email;
-    message($('#forgotMessage'),data.message,true);
-    $('#verifyResetForm').classList.remove('hidden');
-  } catch(err){message($('#forgotMessage'),err.message);}
+    await api('/api/auth/forgot-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})});
+  } catch(err) {
+    message($('#forgotMessage'),err.message);
+  }
 });
-$('#verifyResetForm').addEventListener('submit',async e=>{
-  e.preventDefault();
-  const code=String(new FormData(e.target).get('code')).trim();
-  try {
-    const data=await api('/api/auth/verify-reset-code',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:resetEmail,code})});
-    message($('#verifyResetMessage'),data.message,true);
-    $('#newPasswordForm').classList.remove('hidden');
-  } catch(err){message($('#verifyResetMessage'),err.message);}
-});
-$('#newPasswordForm').addEventListener('submit',async e=>{
-  e.preventDefault();
-  const form=new FormData(e.target);
-  if(form.get('password')!==form.get('confirm_password'))
-    return message($('#newPasswordMessage'),'Passwords do not match.');
-  try {
-    const data=await api('/api/auth/reset-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:resetEmail,code:$('#verifyResetForm [name=code]').value.trim(),password:form.get('password')})});
-    message($('#newPasswordMessage'),data.message,true);
-    e.target.reset();
-    setTimeout(()=>showAuth(false),1200);
-  } catch(err){message($('#newPasswordMessage'),err.message);}
-});
+
 $('#menuToggle').addEventListener('click',()=>$('#mainNav').classList.toggle('open'));
 
 $('#loginForm').addEventListener('submit',async e=>{
@@ -128,10 +106,7 @@ $('#registerForm').addEventListener('submit',async e=>{
   const body=Object.fromEntries(f.entries()); delete body.confirm_password;
   try {
     const data=await api('/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-    const emailNote = data.notification === 'sent'
-      ? ' A confirmation email has been sent.'
-      : ' Email delivery is not configured or is temporarily unavailable; please check the Resend settings.';
-    message($('#registerMessage'),data.message + emailNote,true);
+    message($('#registerMessage'),data.message,true);
     e.target.reset(); $('#adminCodeWrap').classList.add('hidden');
   } catch(err){message($('#registerMessage'),err.message);}
 });
