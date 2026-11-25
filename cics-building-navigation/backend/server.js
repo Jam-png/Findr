@@ -188,6 +188,7 @@ app.post('/api/auth/login', authLimiter, async (req, res, next) => {
     if (!profile.data) profile = await db.from('users').select('*').eq('email', value.toLowerCase()).eq('role', role).maybeSingle();
     if (profile.error) throw profile.error;
     let user = profile.data;
+    let authSession = null
     if (!user) return res.status(401).json({ error: 'Incorrect login details or account type.' });
 
     // If this is a legacy record, verify its existing bcrypt password, then create/link its Auth identity.
