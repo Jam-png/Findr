@@ -199,9 +199,23 @@ app.post('/api/auth/login', authLimiter, async (req, res, next) => {
         user_metadata: { full_name: user.full_name, username: user.username }
       });
       if (created.error) throw created.error;
-      const linked = await db.from('users').update({ auth_user_id: created.data.user.id }).eq('id', user.id).select('*').single();
-      if (linked.error) { await db.auth.admin.deleteUser(created.data.user.id).catch(() => {}); throw linked.error; }
-      user = linked.data;
+     console.log('[LOGIN] Attempting to link legacy account:', user.id);
+
+const linked = await db
+  .from('users')
+  .update({ auth_user_id: created.data.user.id })
+  .eq('id', user.id)
+  .select('*')
+  .single();
+
+if (linked.error) {
+  console.error('[LOGIN] Account linking failed:', linked.error);
+  await db.auth.admin.deleteUser(created.data.user.id).catch(() => {});
+  throw linked.error;
+}
+
+console.log('[LOGIN] Account linked successfully.');
+user = linked.data;
     } else {
       const signedIn = await authClient.auth.signInWithPassword({
   email: user.email,
