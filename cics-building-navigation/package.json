@@ -9,7 +9,7 @@
     "start": "node backend/server.js",
     "dev": "nodemon backend/server.js",
     "migrate:auth": "node scripts/migrate-auth-users.js",
-    "check": "node --check backend/server.js && node --check backend/db.js && node --check backend/migrate-auth-users.js && node --check public/js/app.js"
+    "check": "node --check backend/server.js && node --check backend/db.js && node --check scripts/migrate-auth-users.js && node --check public/js/app.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.0",
