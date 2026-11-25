@@ -1,6 +1,7 @@
 const $ = (s, root=document) => root.querySelector(s);
 const $$ = (s, root=document) => [...root.querySelectorAll(s)];
 let currentUser = null, selectedRole = 'student', floors = [], rooms = [], buildings = [], selectedFloor = null, selectedRoom = null;
+let supabaseClient = null, passwordRecoveryActive = false;
 let directoryMode = 'all', directoryCategory = 'All', directoryCache = [], adminReportCache = [], adminReportStatusFilter = 'All';
 
 async function api(url, options={}) {
@@ -10,12 +11,41 @@ async function api(url, options={}) {
   if (!response.ok) throw new Error(data.error || 'Something went wrong.');
   return data;
 }
+async function initSupabaseClient() {
+  if (!window.supabase?.createClient) throw new Error('Supabase Auth library did not load. Refresh the page and try again.');
+  const config = await api('/api/config');
+  if (!config.supabaseUrl || !config.supabaseAnonKey) throw new Error('Supabase Auth is not configured.');
+  supabaseClient = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey, {
+    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+  });
+  supabaseClient.auth.onAuthStateChange((event, session) => {
+    if (event === 'PASSWORD_RECOVERY' && session) {
+      passwordRecoveryActive = true;
+      $('#authView').classList.remove('hidden'); $('#appView').classList.add('hidden');
+      $('#loginPanel').classList.add('hidden'); $('#registerPanel').classList.add('hidden'); $('#forgotPanel').classList.add('hidden');
+      $('#resetPanel').classList.remove('hidden');
+      history.replaceState({}, document.title, `${location.pathname}?reset-password=1`);
+    }
+  });
+  const { data: sessionData } = await supabaseClient.auth.getSession();
+  if (new URLSearchParams(location.search).has('reset-password') && sessionData.session) {
+    passwordRecoveryActive = true;
+    $('#authView').classList.remove('hidden'); $('#appView').classList.add('hidden');
+    $('#loginPanel').classList.add('hidden'); $('#registerPanel').classList.add('hidden'); $('#forgotPanel').classList.add('hidden');
+    $('#resetPanel').classList.remove('hidden');
+  }
+}
 function toast(message) { const el=$('#toast'); el.textContent=message; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),2800); }
 function message(el, text, success=false) { el.textContent=text; el.classList.toggle('success',success); }
 function showAuth(register=false) {
   $('#authView').classList.remove('hidden'); $('#appView').classList.add('hidden');
+  if (passwordRecoveryActive) {
+    $('#loginPanel').classList.add('hidden'); $('#registerPanel').classList.add('hidden'); $('#forgotPanel').classList.add('hidden');
+    $('#resetPanel').classList.remove('hidden');
+    return;
+  }
   $('#loginPanel').classList.toggle('hidden',register); $('#registerPanel').classList.toggle('hidden',!register);
-  $('#forgotPanel').classList.add('hidden');
+  $('#forgotPanel').classList.add('hidden'); $('#resetPanel').classList.add('hidden');
 }
 function showApp() {
   $('#authView').classList.add('hidden'); $('#appView').classList.remove('hidden');
@@ -75,20 +105,41 @@ $('#showLogin').addEventListener('click',e=>{e.preventDefault();showAuth(false)}
 $('#registerRole').addEventListener('change',e=>$('#adminCodeWrap').classList.toggle('hidden',e.target.value!=='admin'));
 $('#forgotLink').addEventListener('click',e=>{
   e.preventDefault();
-  $('#loginPanel').classList.add('hidden'); $('#registerPanel').classList.add('hidden');
-  $('#forgotPanel').classList.remove('hidden');
-  $('#forgotMessage').textContent='';
+  $('#loginPanel').classList.add('hidden'); $('#registerPanel').classList.add('hidden'); $('#resetPanel').classList.add('hidden');
+  $('#forgotPanel').classList.remove('hidden'); $('#forgotMessage').textContent='';
 });
 $('#backToLogin').addEventListener('click',e=>{e.preventDefault();showAuth(false)});
 
 $('#forgotForm').addEventListener('submit',async e=>{
   e.preventDefault();
-  const email=new FormData(e.target).get('email').trim().toLowerCase();
+  const email=String(new FormData(e.target).get('email')||'').trim().toLowerCase();
+  const submit=e.target.querySelector('button[type="submit"]'); submit.disabled=true;
   try {
-    await api('/api/auth/forgot-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})});
-  } catch(err) {
-    message($('#forgotMessage'),err.message);
-  }
+    if(!supabaseClient) throw new Error('Authentication is still loading. Please try again in a moment.');
+    const {error}=await supabaseClient.auth.resetPasswordForEmail(email,{redirectTo:`${window.location.origin}/?reset-password=1`});
+    if(error) throw error;
+    message($('#forgotMessage'),'If an account exists for that email, a password-reset link has been sent. Please check your inbox.',true);
+  } catch(err) { message($('#forgotMessage'),err.message); }
+  finally { submit.disabled=false; }
+});
+
+$('#resetForm').addEventListener('submit',async e=>{
+  e.preventDefault(); const f=new FormData(e.target);
+  const password=String(f.get('password')||'');
+  if(password!==String(f.get('confirm_password')||'')) return message($('#resetMessage'),'Passwords do not match.');
+  if(password.length<8) return message($('#resetMessage'),'Password must contain at least 8 characters.');
+  const submit=e.target.querySelector('button[type="submit"]'); submit.disabled=true;
+  try {
+    if(!supabaseClient) throw new Error('Authentication is not ready. Refresh the reset link and try again.');
+    const {error}=await supabaseClient.auth.updateUser({password});
+    if(error) throw error;
+    await supabaseClient.auth.signOut();
+    passwordRecoveryActive = false;
+    history.replaceState({},document.title,location.pathname);
+    e.target.reset(); showAuth(false);
+    message($('#loginMessage'),'Your password has been updated. You can now log in.',true);
+  } catch(err) { message($('#resetMessage'),err.message); }
+  finally { submit.disabled=false; }
 });
 
 $('#menuToggle').addEventListener('click',()=>$('#mainNav').classList.toggle('open'));
@@ -266,6 +317,7 @@ function renderRooms(){
   $$('#roomGrid [data-room]').forEach(button=>button.addEventListener('click',()=>{
     selectedRoom=rooms.find(r=>Number(r.id)===Number(button.dataset.room));
     renderRooms();renderRoomDetails();
+    requestAnimationFrame(()=>$('#roomGrid [data-room].selected')?.scrollIntoView({behavior:'smooth',block:'center',inline:'center'}));
   }));
   renderRoomDetails();
 }
@@ -275,7 +327,7 @@ function renderRoomDetails(){
   if(r){
     const floor=floors.find(f=>Number(f.id)===Number(r.floor_id));
     const roomType=(r.room_type||'Destination').toUpperCase();
-    $('#roomDetails').innerHTML=`<div class="location-banner"><span class="destination-pin">⌖</span><b>DESTINATION SELECTED</b></div><div class="room-details-content"><div class="selected-destination"><small class="detail-type">${escapeHtml(roomType)}</small><h3>${escapeHtml(r.room_name)}</h3><p class="muted">⌁ &nbsp; ${escapeHtml(floor?.floor_name||r.floor_name||'CICS Building')}, CICS Building</p></div><div class="navigation-guide"><b>⌖ &nbsp; Navigation guide</b><p>Go to the ${escapeHtml(ordinalFloor(floor?.floor_number||''))} floor and follow the main hallway. ${escapeHtml(r.room_name)} is highlighted on the floor plan.</p></div><button class="btn outline report-room-action" id="reportRoomBtn">⚠ &nbsp; Report a problem here</button></div>`;
+    $('#roomDetails').innerHTML=`<div class="location-banner"><span class="destination-pin">⌖</span><b>DESTINATION SELECTED</b></div><div class="room-details-content"><div class="selected-destination"><small class="detail-type">${escapeHtml(roomType)}</small><h3>${escapeHtml(r.room_name)}</h3><p class="muted">⌁ &nbsp; ${escapeHtml(floor?.floor_name||r.floor_name||'CICS Building')}, CICS Building</p></div><div class="navigation-guide"><b>⌖ &nbsp; Navigation guide</b><p>Go to the ${escapeHtml(ordinalFloor(floor?.floor_number||''))} floor. Use the floor plan to identify the highlighted destination, then follow the building's hallway from the stairs. Confirm the exact route with on-site signs or staff.</p></div><button class="btn outline report-room-action" id="reportRoomBtn">⚠ &nbsp; Report a problem here</button></div>`;
   }else{
     $('#roomDetails').innerHTML=`<div class="location-banner"><span class="destination-pin">⌖</span><b>SELECT A DESTINATION</b></div><div class="room-details-content"><div><small class="detail-type">CICS BUILDING</small><h3>Choose a room or facility</h3><p class="muted">Select any room on the floor plan to view its location and navigation guide.</p></div><div class="navigation-guide"><b>⌖ &nbsp; Navigation guide</b><p>Your selected destination and directions will appear here.</p></div></div>`;
   }
@@ -316,19 +368,29 @@ function getDirectoryRooms(){
 function renderDirectoryPage(){
   if(!rooms.length)return;
   const heading=directoryMode==='laboratories'?'Where are the laboratories?':directoryMode==='offices'?'Where are the offices?':'Where do you need to go?';
-  const subtitle=directoryMode==='laboratories'?'Browse registered laboratory destinations across the CICS Building.':directoryMode==='offices'?'Offices on the 1st floor near the stairs and the 2nd floor.':'Search all destinations across the CICS Building.';
-  $('#directoryHeading').textContent=heading;$('#directorySubtitle').textContent=subtitle;
+  const subtitle=directoryMode==='laboratories'?'Browse registered laboratory destinations across the CICS Building.':directoryMode==='offices'?'Browse offices and student services by floor.':'Browse destinations grouped by floor. Offices and facilities appear at the end of each floor row.';
+  $('#directoryHeading').textContent=heading; $('#directorySubtitle').textContent=subtitle;
   const list=getDirectoryRooms();
   $('#directoryResultsLabel').textContent=directoryCategory==='All'?(directoryMode==='laboratories'?'Laboratories':directoryMode==='offices'?'Offices':'All destinations'):directoryCategory;
   $('#directoryCount').textContent=`${list.length} result${list.length===1?'':'s'}`;
-  $('#directoryResults').innerHTML=list.length?list.map(r=>{
-    const category=destinationCategory(r);const floor=escapeHtml(r.floor_name||`${ordinalFloor(r.floor_number)} Floor`);
-    return `<article class="directory-result"><span class="directory-result-icon ${category.toLowerCase()}">${destinationIcon(category)}</span><div class="directory-result-copy"><b>${escapeHtml(r.room_name)}</b><small>${floor} · ${category==='Laboratories'?'Laboratory':category==='Offices'?'Office':category==='Facilities'?'Facility':'Classroom'}</small></div><button type="button" class="directory-map-link" data-directory-room="${r.id}">View on map <span>→</span></button></article>`;
-  }).join(''):'<div class="directory-empty"><b>No matching destinations found.</b><p>Try another search or choose a different category.</p></div>';
+  const floorNumbers=[...new Set(list.map(r=>Number(r.floor_number)).filter(Number.isFinite))].sort((a,b)=>a-b);
+  const floorMarkup=floorNumbers.map(number=>{
+    const floorRooms=list.filter(r=>Number(r.floor_number)===number).sort((a,b)=>{
+      const rank=r=>['Classrooms','Laboratories'].includes(destinationCategory(r))?0:destinationCategory(r)==='Offices'?1:2;
+      return rank(a)-rank(b)||String(a.room_number).localeCompare(String(b.room_number),undefined,{numeric:true});
+    });
+    const floorName=floorRooms[0]?.floor_name||`${ordinalFloor(number)} Floor`;
+    return `<section class="directory-floor-row"><div class="directory-floor-heading"><span class="directory-floor-number">${number}</span><div><b>${escapeHtml(floorName)}</b><small>${floorRooms.length} destination${floorRooms.length===1?'':'s'}</small></div></div><div class="directory-tile-grid">${floorRooms.map(r=>{
+      const category=destinationCategory(r); const kind=category.toLowerCase();
+      return `<button type="button" class="directory-tile ${kind}" data-directory-room="${r.id}" aria-label="View ${escapeHtml(r.room_name)} on map"><span class="directory-tile-icon">${destinationIcon(category)}</span><b>${escapeHtml(r.room_name)}</b><small>${escapeHtml(r.room_number||category)}</small><span class="directory-tile-floor">${category}</span></button>`;
+    }).join('')}</div></section>`;
+  }).join('');
+  $('#directoryResults').innerHTML=list.length?floorMarkup:'<div class="directory-empty"><b>No matching destinations found.</b><p>Try another search or choose a different category.</p></div>';
   $$('[data-directory-room]').forEach(button=>button.addEventListener('click',()=>{
-    const room=rooms.find(r=>String(r.id)===button.dataset.directoryRoom);if(!room)return;
-    selectedFloor=room.floor_id;selectedRoom=room;$('#mapSearch').value='';go('map');
-    renderFloorSelector([...floors].sort((a,b)=>Number(b.floor_number)-Number(a.floor_number)));renderRooms();renderRoomDetails();
+    const room=rooms.find(r=>String(r.id)===button.dataset.directoryRoom); if(!room)return;
+    selectedFloor=room.floor_id; selectedRoom=room; $('#mapSearch').value=''; go('map');
+    renderFloorSelector([...floors].sort((a,b)=>Number(b.floor_number)-Number(a.floor_number))); renderRooms(); renderRoomDetails();
+    requestAnimationFrame(()=>$('#roomGrid [data-room].selected')?.scrollIntoView({behavior:'smooth',block:'center',inline:'center'}));
   }));
 }
 $('#directorySearch').addEventListener('input',renderDirectoryPage);
@@ -378,6 +440,7 @@ $('#adminReportRefresh').addEventListener('click',loadAdminReports);
 $('#adminReportFilter').addEventListener('change',e=>{adminReportStatusFilter=e.target.value;renderAdminReports();});
 
 (async function init(){
-  try{const data=await api('/api/auth/me');if(data.user){currentUser=data.user;showApp();await loadReferenceData();go('home');}else showAuth(false);}
-  catch(_){showAuth(false);}
+  try { await initSupabaseClient(); } catch(error) { console.error('[Findr Auth]',error); }
+  try{const data=await api('/api/auth/me');if(data.user){currentUser=data.user;showApp();await loadReferenceData();go('home');}else if(!passwordRecoveryActive) showAuth(false);}
+  catch(_){if(!passwordRecoveryActive) showAuth(false);}
 })();
