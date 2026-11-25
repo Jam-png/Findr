@@ -4,11 +4,35 @@ let currentUser = null, selectedRole = 'student', floors = [], rooms = [], build
 let supabaseClient = null, passwordRecoveryActive = false;
 let directoryMode = 'all', directoryCategory = 'All', directoryCache = [], adminReportCache = [], adminReportStatusFilter = 'All';
 
-async function api(url, options={}) {
-  const response = await fetch(url, { credentials: 'same-origin', ...options });
+async function api(url, options = {}) {
+  const headers = new Headers(options.headers || {});
+
+  if (supabaseClient) {
+    const { data } = await supabaseClient.auth.getSession();
+
+    if (data.session?.access_token) {
+      headers.set(
+        'Authorization',
+        `Bearer ${data.session.access_token}`
+      );
+    }
+  }
+
+  const response = await fetch(url, {
+    credentials: 'same-origin',
+    ...options,
+    headers
+  });
+
   const type = response.headers.get('content-type') || '';
-  const data = type.includes('application/json') ? await response.json() : {};
-  if (!response.ok) throw new Error(data.error || 'Something went wrong.');
+  const data = type.includes('application/json')
+    ? await response.json()
+    : {};
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Something went wrong.');
+  }
+
   return data;
 }
 async function initSupabaseClient() {
@@ -144,12 +168,55 @@ $('#resetForm').addEventListener('submit',async e=>{
 
 $('#menuToggle').addEventListener('click',()=>$('#mainNav').classList.toggle('open'));
 
-$('#loginForm').addEventListener('submit',async e=>{
-  e.preventDefault(); const f=new FormData(e.target);
+$('#loginForm').addEventListener('submit', async e => {
+  e.preventDefault();
+
+  const f = new FormData(e.target);
+  const submit = e.target.querySelector('button[type="submit"]');
+
+  submit.disabled = true;
+
   try {
-    const data=await api('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({identifier:f.get('identifier'),password:f.get('password'),role:selectedRole})});
-    currentUser=data.user; showApp(); go('home'); await loadReferenceData(); toast('Welcome to Findr!');
-  } catch(err){message($('#loginMessage'),err.message);}
+    if (!supabaseClient) {
+      throw new Error('Supabase Auth is not ready. Please refresh the page.');
+    }
+
+    const data = await api('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        identifier: f.get('identifier'),
+        password: f.get('password'),
+        role: selectedRole
+      })
+    });
+
+    const { error: sessionError } = await supabaseClient.auth.setSession({
+      access_token: data.access_token,
+      refresh_token: data.refresh_token
+    });
+
+    if (sessionError) throw sessionError;
+
+    const profile = await api('/api/auth/me');
+
+    if (!profile.user) {
+      throw new Error('Unable to load your Findr account profile.');
+    }
+
+    currentUser = profile.user;
+
+    showApp();
+    go('home');
+
+    await loadReferenceData();
+
+    toast('Welcome to Findr!');
+  } catch (err) {
+    message($('#loginMessage'), err.message);
+  } finally {
+    submit.disabled = false;
+  }
 });
 $('#registerForm').addEventListener('submit',async e=>{
   e.preventDefault(); const f=new FormData(e.target);
@@ -161,9 +228,22 @@ $('#registerForm').addEventListener('submit',async e=>{
     e.target.reset(); $('#adminCodeWrap').classList.add('hidden');
   } catch(err){message($('#registerMessage'),err.message);}
 });
-$('#logoutBtn').addEventListener('click',async()=>{
-  try{await api('/api/auth/logout',{method:'POST'});}catch(_){}
-  currentUser=null; showAuth(false); $('#loginForm').reset(); toast('You have logged out.');
+$('#logoutBtn').addEventListener('click', async () => {
+  try {
+    if (supabaseClient) {
+      await supabaseClient.auth.signOut();
+    }
+
+    currentUser = null;
+    passwordRecoveryActive = false;
+
+    showAuth(false);
+    $('#loginForm').reset();
+
+    toast('You have logged out.');
+  } catch (error) {
+    toast(error.message);
+  }
 });
 
 async function loadReferenceData(){
