@@ -8,13 +8,8 @@
 </head>
 <body>
   <div id="authView" class="auth-shell">
-    <aside class="auth-brand">
-      <a class="brand light" href="#"><span class="brand-mark">⌖</span><span>Findr<small>CICS BUILDING GUIDE</small></span></a>
-      <div class="brand-copy"><small>CICS BUILDING GUIDE</small><h1>Your campus,<br>easier to navigate.</h1>
-        <p>Find rooms, explore every floor, and report building concerns through one secure university platform.</p></div>
-      <span class="brand-foot">Batangas State University · CICS</span>
-    </aside>
     <main class="auth-panel">
+      <div class="auth-intro"><a class="brand" href="#"><span class="brand-mark">⌖</span><span>Findr<small>CICS BUILDING GUIDE</small></span></a><small class="eyebrow">BATANGAS STATE UNIVERSITY · CICS</small><h1>Your campus,<br>easier to navigate.</h1><p>Find rooms, explore every floor, and report building concerns through one secure university platform.</p></div>
       <section id="loginPanel" class="auth-card-wrap">
         <small class="eyebrow">WELCOME BACK</small><h2 id="loginHeading">Student Login</h2>
         <p class="muted">Use your registered student username or email address.</p>
@@ -43,14 +38,24 @@
       </section>
       <section id="forgotPanel" class="auth-card-wrap hidden">
         <small class="eyebrow">ACCOUNT RECOVERY</small><h2>Reset your password</h2>
-        <p class="muted">Email-based password recovery is temporarily unavailable because Findr does not currently have an email service configured.</p>
+        <p class="muted">Enter the email address linked to your Findr account. We will send you a secure password-reset link.</p>
         <form id="forgotForm" class="card form-card">
-          <label>Registered email address<input name="email" type="email" required placeholder="Enter your registered email"></label>
-          <button class="btn primary full" type="submit">Check recovery options</button>
+          <label>Registered email address<input name="email" type="email" required autocomplete="email" placeholder="Enter your registered email"></label>
+          <button class="btn primary full" type="submit">Send reset link</button>
           <p id="forgotMessage" class="message" aria-live="polite"></p>
-          <p class="muted">Please contact the Findr administrator for help recovering your account. Your password will not be changed unless your identity can be verified.</p>
+          <p class="muted form-note">If you do not see the email, check your spam or junk folder.</p>
         </form>
         <p class="center muted">Remembered your password? <a href="#" id="backToLogin">Back to login</a></p>
+      </section>
+      <section id="resetPanel" class="auth-card-wrap hidden">
+        <small class="eyebrow">SECURE ACCOUNT UPDATE</small><h2>Choose a new password</h2>
+        <p class="muted">Enter a new password for your Findr account.</p>
+        <form id="resetForm" class="card form-card">
+          <label>New password<div class="password-wrap"><input name="password" type="password" minlength="8" required autocomplete="new-password" placeholder="At least 8 characters"><button type="button" class="show-password" aria-label="Show password" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></button></div></label>
+          <label>Confirm new password<div class="password-wrap"><input name="confirm_password" type="password" minlength="8" required autocomplete="new-password" placeholder="Enter your new password again"><button type="button" class="show-password" aria-label="Show password" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></button></div></label>
+          <button class="btn primary full" type="submit">Update password</button>
+          <p id="resetMessage" class="message" aria-live="polite"></p>
+        </form>
       </section>
     </main>
   </div>
@@ -76,7 +81,7 @@
           <div class="hero-copy"><small class="eyebrow">CICS BUILDING GUIDE</small><h1>Find Your Way<br>Around CICS.</h1>
             <p>Navigate rooms, laboratories, and offices with confidence. Findr puts the entire CICS Building at your fingertips.</p>
             <div class="search-row"><input id="homeSearch" placeholder="⌕  Search room, laboratory, or office..."><button class="btn primary" id="homeSearchBtn">Explore Building Map →</button></div>
-            <button class="text-button" data-page="map">View all destinations →</button>
+            <button class="text-button" data-page="directory">View all destinations →</button>
           </div>
           <div class="hero-preview"><div class="preview-top"><span>▦</span><b>CICS Building</b><span class="status">● DIRECTORY</span></div><div class="mini-grid"><span>Room 101</span><span>Room 102</span><span class="selected">Room 103</span><span>Room 104</span><span>Room 105</span><span>Lab 1</span></div><div class="preview-note">⌖ CICS Student Services</div></div>
         </div>
@@ -152,6 +157,7 @@
     <footer><div class="footer-brand">⌖ Findr <small>CICS BUILDING GUIDE</small><p>Your guide to the College of Informatics and Computing Sciences.</p></div><div><b>QUICK LINKS</b><button data-page="home">Home</button><button data-page="map">Building Map</button><button data-page="report">Report a Problem</button></div><div><b>INFORMATION</b><button data-page="about">About</button><span>Batangas State University</span></div></footer>
   </div>
   <div id="toast" class="toast" role="status"></div>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
