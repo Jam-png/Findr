@@ -223,10 +223,23 @@ authSession = signedIn.data.session;
 
     // Confirm the newly migrated identity can authenticate before issuing the app cookie.
     if (!user.auth_user_id) return res.status(500).json({ error: 'Unable to link this account to Supabase Auth.' });
-    if (user.auth_user_id && !profile.data.auth_user_id) {
-      const check = await authClient.auth.signInWithPassword({ email: user.email, password: String(password) });
-      if (check.error || check.data.user.id !== user.auth_user_id) return res.status(401).json({ error: 'Unable to verify the migrated account.' });
-    }
+   if (user.auth_user_id && !profile.data.auth_user_id) {
+  const check = await authClient.auth.signInWithPassword({
+    email: user.email,
+    password: String(password)
+  });
+
+  if (
+    check.error ||
+    check.data.user.id !== user.auth_user_id
+  ) {
+    return res.status(401).json({
+      error: 'Unable to verify the migrated account.'
+    });
+  }
+
+  authSession = check.data.session;
+}
     sendCookie(res, user);
     res.json({ message: 'Login successful.', user: publicUser(user) });
   } catch (error) { next(error); }
