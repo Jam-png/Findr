@@ -612,3 +612,227 @@ footer{background:#061d36;color:#dce9f3;padding:40px max(5%,calc((100% - 1240px)
     font-size: 6px;
   }
 }
+
+
+/* =========================================
+   FINDR MAIN INTERFACE - BLUE NAVIGATION THEME
+   Authentication screens remain unchanged.
+========================================= */
+
+:root {
+  --navy: #082b55;
+  --blue: #1768d2;
+  --cyan: #13b8c5;
+  --ink: #173451;
+  --muted: #657d96;
+  --pale: #eef5fc;
+  --line: #d9e6f2;
+  --white: #ffffff;
+  --shadow: 0 12px 32px rgba(8, 43, 85, .09);
+}
+
+#appView {
+  min-height: 100vh;
+  background: #f1f6fc;
+}
+
+#appView .topbar {
+  background: #082b55;
+  border-bottom: 1px solid #174a7c;
+  box-shadow: 0 5px 20px rgba(8, 43, 85, .13);
+}
+
+#appView .topbar .brand {
+  color: #ffffff;
+}
+
+#appView .topbar .brand small {
+  color: #b9d8f5;
+}
+
+#appView .topbar .brand-mark {
+  background: linear-gradient(135deg, #16c5ce, #1675db);
+}
+
+#appView .nav-link {
+  color: #d8e9fb;
+}
+
+#appView .nav-link.active {
+  color: #5de3e5;
+  border-bottom-color: #5de3e5;
+}
+
+#appView .user-badge {
+  color: #c6dcf1;
+}
+
+#appView .page {
+  background: transparent;
+}
+
+#appView .hero {
+  background:
+    radial-gradient(circle at 90% 10%, #1a82c7 0, transparent 35%),
+    linear-gradient(120deg, #082b55, #105b9c 65%, #087f9d);
+  color: #ffffff;
+  box-shadow: 0 18px 45px rgba(8, 43, 85, .15);
+  position: relative;
+  overflow: hidden;
+}
+
+#appView .hero:after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: .12;
+  background-image:
+    linear-gradient(#ffffff 1px, transparent 1px),
+    linear-gradient(90deg, #ffffff 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+#appView .hero-copy,
+#appView .hero-preview {
+  position: relative;
+  z-index: 1;
+}
+
+#appView .hero h1 {
+  color: #ffffff;
+}
+
+#appView .hero-copy p {
+  color: #d2e6f8;
+}
+
+#appView .hero .eyebrow {
+  color: #64e2e5;
+}
+
+#appView .hero .text-button {
+  color: #bdefff;
+}
+
+#appView .quick-card {
+  border-color: #d8e6f3;
+  background: #ffffff;
+  box-shadow: 0 7px 22px rgba(8, 43, 85, .045);
+}
+
+#appView .quick-card:hover {
+  border-color: #50b8dc;
+  box-shadow: 0 13px 28px rgba(8, 75, 130, .12);
+}
+
+#appView .btn.primary {
+  background: linear-gradient(110deg, #1673df, #0754ad);
+}
+
+#appView .cta {
+  background: linear-gradient(110deg, #082b55, #1266a6, #0796a9);
+  box-shadow: 0 12px 28px rgba(8, 43, 85, .15);
+}
+
+#appView .floor-sidebar,
+#appView .room-details,
+#appView .admin-calendar-panel,
+#appView .admin-reports-list {
+  background: #ffffff;
+  border-color: #d9e6f2;
+  box-shadow: 0 8px 25px rgba(8, 43, 85, .055);
+}
+
+#appView .floor-button.active {
+  background: #dceeff;
+  color: #0758ad;
+}
+
+#appView .building-map-shell {
+  background: linear-gradient(145deg, #082f60, #07558b);
+  border: 1px solid #0e6ba0;
+  box-shadow: 0 15px 35px rgba(8, 43, 85, .15);
+}
+
+#appView #roomGrid.room-grid {
+  background-color: #edf5fc;
+  background-image:
+    linear-gradient(#d9e7f4 1px, transparent 1px),
+    linear-gradient(90deg, #d9e7f4 1px, transparent 1px);
+}
+
+#appView .plan-side-zone,
+#appView .plan-rooms-row,
+#appView .plan-hallway {
+  background: #ffffff;
+  border-color: #a9c7e2;
+}
+
+#appView .plan-room.classroom {
+  background: #dcecff;
+  color: #14518d;
+  border-color: #9fc3e8;
+}
+
+#appView .plan-room.lab {
+  background: #d8f4f4;
+  color: #087b85;
+  border-color: #8bd4d9;
+}
+
+#appView .plan-room.office {
+  background: #eae5ff;
+  color: #6547a0;
+  border-color: #c5b6ec;
+}
+
+#appView .plan-room.facility,
+#appView .plan-side-marker {
+  background: #fff0e4;
+  color: #985c2e;
+  border-color: #edc49e;
+}
+
+#appView .plan-room.selected,
+#appView .plan-side-marker.selected {
+  background: #baf1f2;
+  color: #075e72;
+  border: 2px solid #0ba9bd;
+}
+
+#appView .directory-tile {
+  background: linear-gradient(145deg, #ffffff, #f0f6fd);
+  border-color: #d6e5f3;
+}
+
+#appView .directory-tile:hover {
+  border-color: #3a9bd7;
+}
+
+#appView .directory-filter.active {
+  background: #0b4d8e;
+  border-color: #0b4d8e;
+}
+
+#appView .navigation-guide {
+  background: #edf6ff;
+  border-color: #c9e1f5;
+}
+
+#appView .status-pill {
+  background: #e1f6ec;
+  color: #18764b;
+}
+
+#appView .priority-pill.high,
+#appView .priority-pill.urgent {
+  background: #ffebe8;
+  color: #b83232;
+}
+
+@media (max-width: 850px) {
+  #appView .topbar nav {
+    background: #082b55;
+  }
+}
