@@ -526,8 +526,40 @@ function renderAdminReports(){
 $('#adminReportRefresh').addEventListener('click',loadAdminReports);
 $('#adminReportFilter').addEventListener('change',e=>{adminReportStatusFilter=e.target.value;renderAdminReports();});
 
+
 (async function init(){
-  try { await initSupabaseClient(); } catch(error) { console.error('[Findr Auth]',error); }
-  try{const data=await api('/api/auth/me');if(data.user){currentUser=data.user;showApp();await loadReferenceData();go('home');}else if(!passwordRecoveryActive) showAuth(false);}
-  catch(_){if(!passwordRecoveryActive) showAuth(false);}
+  try {
+    await initSupabaseClient();
+  } catch(error) {
+    console.error('[Findr Auth]', error);
+  }
+
+  // Never redirect to the main interface during password recovery.
+  if (passwordRecoveryActive) {
+    showAuth(false);
+    return;
+  }
+
+  try {
+    const data = await api('/api/auth/me');
+
+    // Check again in case password recovery started during the API request.
+    if (passwordRecoveryActive) {
+      showAuth(false);
+      return;
+    }
+
+    if (data.user) {
+      currentUser = data.user;
+      showApp();
+      await loadReferenceData();
+      go('home');
+    } else {
+      showAuth(false);
+    }
+  } catch(error) {
+    if (!passwordRecoveryActive) {
+      showAuth(false);
+    }
+  }
 })();
