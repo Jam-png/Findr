@@ -319,3 +319,296 @@ footer{background:#061d36;color:#dce9f3;padding:40px max(5%,calc((100% - 1240px)
 @keyframes findr-room-focus{0%{transform:scale(.94)}55%{transform:scale(1.1)}100%{transform:scale(1.055)}}
 .navigation-guide{border:1px solid #d9eaf5;background:linear-gradient(135deg,#f0f8ff,#f1fbfc)}
 .navigation-guide p{font-size:11px;line-height:1.65}
+
+
+/* =========================================
+   ADMIN REPORT CALENDAR
+========================================= */
+
+.admin-calendar-panel {
+  margin-top: 30px;
+  padding: 22px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 8px 25px rgba(30, 66, 100, .04);
+}
+
+.admin-calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.admin-calendar-header h2 {
+  font-size: 21px;
+  margin: 5px 0;
+}
+
+.admin-calendar-header p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.admin-calendar-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-calendar-controls button {
+  width: 35px;
+  height: 35px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--blue);
+  font-size: 19px;
+}
+
+.admin-calendar-controls button:hover {
+  background: #edf5ff;
+  border-color: #9bc5ed;
+}
+
+#adminCalendarRefresh {
+  width: auto;
+  height: auto;
+  padding: 9px 13px;
+  font-size: 10px;
+}
+
+.admin-calendar-month-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 13px;
+}
+
+#adminCalendarMonth {
+  font: 800 16px Manrope, sans-serif;
+  color: var(--navy);
+}
+
+#adminCalendarMonthCount {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+#adminCalendarGrid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.calendar-weekday {
+  padding: 9px 2px;
+  text-align: center;
+  color: #718096;
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.calendar-day {
+  min-width: 0;
+  min-height: 66px;
+  padding: 8px 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  border: 1px solid #e5edf5;
+  border-radius: 9px;
+  background: #fbfdff;
+  color: var(--ink);
+  transition: .15s;
+}
+
+.calendar-day:not(.empty):hover {
+  border-color: #80b9e8;
+  background: #eff7ff;
+}
+
+.calendar-day.empty {
+  border: 0;
+  background: transparent;
+  pointer-events: none;
+}
+
+.calendar-day-number {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.calendar-day.today {
+  border: 1px solid #1684d9;
+  background: #eef6ff;
+}
+
+.calendar-day.today .calendar-day-number {
+  color: #1260d4;
+}
+
+.calendar-day.has-reports {
+  background: #eaf8f6;
+  border-color: #a9e1d4;
+}
+
+.calendar-day.has-reports .calendar-day-number {
+  color: #087d69;
+}
+
+.calendar-day.selected {
+  background: #1259bd;
+  border-color: #1259bd;
+  color: #fff;
+  box-shadow: 0 4px 12px #1259bd35;
+}
+
+.calendar-day.selected .calendar-day-number {
+  color: #fff;
+}
+
+.calendar-report-count {
+  max-width: 100%;
+  padding: 3px 5px;
+  border-radius: 20px;
+  background: #d5f0e9;
+  color: #087d69;
+  font-size: 8px;
+  font-weight: 700;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.calendar-day.selected .calendar-report-count {
+  background: #ffffff25;
+  color: #fff;
+}
+
+/* Selected date and its reports */
+
+#adminCalendarDayReports {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.calendar-selected-date {
+  margin-bottom: 14px;
+}
+
+.calendar-selected-date h3 {
+  font-size: 17px;
+  margin-bottom: 4px;
+}
+
+.calendar-selected-date p {
+  font-size: 10px;
+  color: var(--muted);
+  margin: 0;
+}
+
+.calendar-report-list {
+  display: grid;
+  gap: 10px;
+}
+
+.calendar-report-item {
+  padding: 15px;
+  border: 1px solid #e3ebf3;
+  border-radius: 10px;
+  background: #fbfdff;
+}
+
+.calendar-report-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 9px;
+}
+
+.calendar-report-heading b {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.calendar-report-item > p {
+  margin: 5px 0;
+  font-size: 10px;
+  color: #60738a;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.calendar-report-item a {
+  display: inline-block;
+  margin-top: 7px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+@media (max-width: 650px) {
+  .admin-calendar-panel {
+    padding: 15px 10px;
+  }
+
+  .admin-calendar-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .admin-calendar-controls {
+    width: 100%;
+  }
+
+  .admin-calendar-controls button:last-child {
+    margin-left: auto;
+  }
+
+  #adminCalendarGrid {
+    gap: 3px;
+  }
+
+  .calendar-day {
+    min-height: 55px;
+    padding: 6px 2px;
+    border-radius: 6px;
+  }
+
+  .calendar-day-number {
+    font-size: 10px;
+  }
+
+  .calendar-report-count {
+    font-size: 7px;
+    padding: 2px 3px;
+  }
+
+  .calendar-weekday {
+    font-size: 8px;
+    padding: 7px 0;
+  }
+
+  .calendar-report-heading {
+    flex-direction: column;
+    gap: 6px;
+  }
+}
+
+@media (max-width: 380px) {
+  .calendar-day {
+    min-height: 48px;
+  }
+
+  .calendar-report-count {
+    font-size: 6px;
+  }
+}
