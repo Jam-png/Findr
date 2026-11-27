@@ -421,14 +421,11 @@ function isExcludedDestination(room) {
 
   // Second floor: only the six requested destinations
   if (
-    floor === 2 &&
-    (
-      name.includes('cicsstudentservices') ||
-      name.includes('facultytoilet')
-    )
-  ) {
-    return true;
-  }
+  floor === 2 &&
+  name.includes('cicsstudentservices')
+) {
+  return true;
+}
 
   // Third floor: Room 301 does not exist
   if (
