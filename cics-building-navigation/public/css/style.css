@@ -836,3 +836,146 @@ footer{background:#061d36;color:#dce9f3;padding:40px max(5%,calc((100% - 1240px)
     background: #082b55;
   }
 }
+
+
+/* ==========================================
+   FINDR - NAVY BLUE NAVIGATION BACKGROUND
+   Main application only
+========================================== */
+
+#appView {
+  min-height: 100vh;
+  background-color: #061b38;
+  background-image:
+    radial-gradient(circle at 12% 18%, rgba(20, 119, 207, .22), transparent 30%),
+    radial-gradient(circle at 88% 75%, rgba(13, 174, 194, .12), transparent 28%),
+    repeating-linear-gradient(
+      0deg,
+      transparent 0px,
+      transparent 39px,
+      rgba(113, 179, 232, .055) 40px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent 0px,
+      transparent 39px,
+      rgba(113, 179, 232, .055) 40px
+    );
+  color: #eaf4ff;
+}
+
+#appView .page {
+  background: transparent;
+  color: #eaf4ff;
+}
+
+#appView .page-title h1,
+#appView .section-heading h2,
+#appView .page h2,
+#appView .page h3 {
+  color: #f2f8ff;
+}
+
+#appView .page .muted,
+#appView .page-title p {
+  color: #a9c1dc;
+}
+
+#appView .topbar {
+  background: rgba(4, 21, 46, .96);
+  border-bottom: 1px solid #24476e;
+}
+
+#appView .topbar .brand {
+  color: #ffffff;
+}
+
+#appView .topbar .brand small {
+  color: #a9c9e9;
+}
+
+#appView .nav-link {
+  color: #c5d9ef;
+}
+
+#appView .nav-link.active {
+  color: #56dce5;
+  border-bottom-color: #56dce5;
+}
+
+#appView .floor-sidebar,
+#appView .room-details,
+#appView .quick-card,
+#appView .directory-tile,
+#appView .report-card,
+#appView .admin-calendar-panel,
+#appView .admin-reports-list {
+  background: #102c50;
+  color: #edf6ff;
+  border: 1px solid #294b70;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, .18);
+}
+
+#appView .floor-button {
+  background: #16385f;
+  color: #dcecff;
+}
+
+#appView .floor-button.active {
+  background: #1766a4;
+  color: #ffffff;
+}
+
+#appView .building-map-shell {
+  background: linear-gradient(145deg, #04172f, #082e59, #06476c);
+  border-color: #28628e;
+}
+
+#appView .navigation-guide {
+  background: #153d62;
+  color: #e6f4ff;
+  border-color: #32658d;
+}
+
+#appView .navigation-guide p {
+  color: #c4d9ed;
+}
+
+#appView .directory-tile:hover,
+#appView .quick-card:hover {
+  border-color: #37c9d7;
+  transform: translateY(-2px);
+}
+
+#appView input,
+#appView select,
+#appView textarea {
+  background: #f8fbff;
+  color: #142d49;
+}
+
+#appView .hero {
+  background:
+    radial-gradient(circle at 90% 10%, rgba(26, 151, 201, .5), transparent 35%),
+    linear-gradient(120deg, #061b38, #0a3d70, #075b78);
+  color: #ffffff;
+}
+
+#appView .hero h1,
+#appView .hero h2 {
+  color: #ffffff;
+}
+
+#appView .hero-copy p {
+  color: #d1e4f7;
+}
+
+#appView .cta {
+  background: linear-gradient(110deg, #082b55, #075b87, #087d91);
+}
+
+@media (max-width: 850px) {
+  #appView .topbar nav {
+    background: #061b38;
+  }
+}
