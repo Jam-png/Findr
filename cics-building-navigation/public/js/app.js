@@ -134,17 +134,24 @@ $('#forgotLink').addEventListener('click',e=>{
 });
 $('#backToLogin').addEventListener('click',e=>{e.preventDefault();showAuth(false)});
 
-$('#forgotForm').addEventListener('submit',async e=>{
+$('#forgotForm').addEventListener('submit', async e => {
   e.preventDefault();
-  const email=String(new FormData(e.target).get('email')||'').trim().toLowerCase();
-  const submit=e.target.querySelector('button[type="submit"]'); submit.disabled=true;
+  const email = String(new FormData(e.target).get('email') || '').trim().toLowerCase();
+  const submit = e.target.querySelector('button[type="submit"]');
+  submit.disabled = true;
+
   try {
-    if(!supabaseClient) throw new Error('Authentication is still loading. Please try again in a moment.');
-    const {error}=await supabaseClient.auth.resetPasswordForEmail(email,{redirectTo:`${window.location.origin}/?reset-password=1`});
-    if(error) throw error;
-    message($('#forgotMessage'),'If an account exists for that email, a password-reset link has been sent. Please check your inbox.',true);
-  } catch(err) { message($('#forgotMessage'),err.message); }
-  finally { submit.disabled=false; }
+    const data = await api('/api/auth/forgot-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    message($('#forgotMessage'), data.message, true);
+  } catch (error) {
+    message($('#forgotMessage'), error.message);
+  } finally {
+    submit.disabled = false;
+  }
 });
 
 $('#resetForm').addEventListener('submit',async e=>{
