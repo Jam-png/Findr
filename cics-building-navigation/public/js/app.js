@@ -256,7 +256,9 @@ $('#logoutBtn').addEventListener('click', async () => {
 async function loadReferenceData(){
   [buildings,floors,rooms]=await Promise.all([api('/api/buildings'),api('/api/floors'),api('/api/rooms')]);
   $('#reportBuilding').innerHTML='<option value="">Select building</option>'+buildings.map(b=>`<option value="${b.id}">${escapeHtml(b.building_name)}</option>`).join('');
-  $('#reportRoom').innerHTML='<option value="">Select a room</option>'+rooms.map(r=>`<option value="${r.id}">${escapeHtml(r.room_name)} · ${escapeHtml(r.floor_name)}</option>`).join('');
+  $('#reportRoom').innerHTML='<option value="">Select a room</option>'+getVisibleDestinationRooms().map(r =>
+  `<option value="${r.id}">${escapeHtml(getDisplayRoomName(r))} · ${escapeHtml(r.floor_name)}</option>`
+).join('');
 }
 function escapeHtml(value=''){return String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 
@@ -270,52 +272,113 @@ async function loadMap(){
 
 // Each floor has its own room sequence and side facilities based on the supplied
 // official CICS Building Map. Keys match room_number values in the Supabase directory.
+
 const FLOOR_PLANS = {
   1: {
-    left: [{key:'WOMENS-TOILET',label:"Women's Toilet",kind:'facility',short:"Women's Toilet"}],
-    main: [
-      {key:'ORGS-OFFICE',label:'CICS Orgs Office',kind:'office',short:'Orgs Office'},
-      ...['101','102','103','104','105','106'].map(n=>({key:n,label:`Room ${n}`,kind:'classroom'}))
+    left: [
+      {
+        key: 'WOMENS-TOILET',
+        label: "Women's Toilet",
+        kind: 'facility',
+        short: "Women's Toilet"
+      }
     ],
-    right: [
-      {key:'UTILITY',label:'Utility Room',kind:'facility',short:'Utility Room'},
-      {key:'FACULTY-TOILET',label:'Faculty Toilet',kind:'facility',short:'Faculty Toilet'}
-    ]
-  },
-  2: {
-    // The source map shows a faculty-toilet marker at both ends, while its directory
-    // lists one Faculty Toilet destination. Both visual markers resolve to that record.
-    left: [{key:'FACULTY-TOILET',label:'Faculty Toilet',kind:'facility',short:'Faculty Toilet'}],
     main: [
-      {key:'201',label:'Room 201',kind:'classroom'}, {key:'202',label:'Room 202',kind:'classroom'},
-      {key:'A',label:'CPE Faculty',kind:'office'}, {key:'B',label:'CICS Student Services',kind:'office'},
-      {key:'C',label:'Consultation Office',kind:'office'}, {key:'D',label:'CICS Faculty',kind:'office'},
-      {key:'E',label:"Dean's Office",kind:'office'}
-    ],
-    right: [{key:'FACULTY-TOILET',label:'Faculty Toilet',kind:'facility',short:'Faculty Toilet',visualOnly:true}]
-  },
-  3: {
-    left: [{key:'WOMENS-TOILET',label:"Women's Toilet",kind:'facility',short:"Women's Toilet"}],
-    main: ['1','2','3','4','5','6'].map(n=>({key:`LAB${n}`,label:`Lab ${n}`,kind:'lab'})),
-    right: [{key:'MENS-TOILET',label:"Men's Toilet",kind:'facility',short:"Men's Toilet"}]
-  },
-  4: {
-    left: [],
-    // Room 402 is retained from the written room directory. The source illustration
-    // has an unclear "EDL" label in this position, so it is not treated as a separate room.
-    main: [
-      {key:'401',label:'Room 401',kind:'classroom'},
-      {key:'PHYSICS-LAB',label:'Physics Lab',kind:'lab'},
-      {key:'SMART-CLASSROOM',label:'Smart Classroom',kind:'classroom'},
-      {key:'402',label:'Room 402',kind:'classroom'},
-      {key:'TECH-LAB',label:'Tech Lab',kind:'lab'},
-      {key:'ITL',label:'ITL',kind:'lab'}
+      { key: 'ORGS-OFFICE', label: 'CICS Orgs Office', kind: 'office' },
+      ...['101', '102', '103', '104', '105', '106'].map(n => ({
+        key: n,
+        label: `Room ${n}`,
+        kind: 'classroom'
+      })),
+      {
+        key: 'UTILITY',
+        label: 'Utility Room',
+        kind: 'facility',
+        short: 'Utility Room'
+      }
     ],
     right: []
   },
+
+  2: {
+    left: [],
+    main: [
+      { key: '201', label: 'Room 201', kind: 'classroom' },
+      { key: '202', label: 'Room 202', kind: 'classroom' },
+      { key: 'A', label: 'CPE Faculty', kind: 'office' },
+      { key: 'C', label: 'Consultation Office', kind: 'office' },
+      { key: 'D', label: 'CICS Faculty', kind: 'office' },
+      { key: 'E', label: "Dean's Office", kind: 'office' }
+    ],
+    right: []
+  },
+
+  3: {
+    left: [
+      {
+        key: 'WOMENS-TOILET',
+        label: "Women's Toilet",
+        kind: 'facility',
+        short: "Women's Toilet"
+      }
+    ],
+    main: ['1', '2', '3', '4', '5', '6'].map(n => ({
+      key: `LAB${n}`,
+      label: `Lab ${n}`,
+      kind: 'lab'
+    })),
+    right: [
+      {
+        key: 'MENS-TOILET',
+        label: "Men's Toilet",
+        kind: 'facility',
+        short: "Men's Toilet"
+      }
+    ]
+  },
+
+  4: {
+    left: [
+      {
+        key: 'WOMENS-TOILET-4F',
+        label: "Women's Toilet",
+        kind: 'facility',
+        short: "Women's Toilet"
+      }
+    ],
+    main: [
+      { key: '401', label: 'Room 401', kind: 'classroom' },
+      {
+        key: 'PHYSICS-LAB',
+        label: 'Physics Lab / RM 402',
+        kind: 'lab'
+      },
+      {
+        key: 'SMART-CLASSROOM',
+        label: 'SMART Classroom',
+        kind: 'classroom'
+      },
+      { key: 'EDL', label: 'EDL', kind: 'lab' },
+      { key: 'TECH-LAB', label: 'Tech Lab', kind: 'lab' },
+      { key: 'ITL', label: 'ITL', kind: 'lab' }
+    ],
+    right: [
+      {
+        key: 'MENS-TOILET-4F',
+        label: "Men's Toilet",
+        kind: 'facility',
+        short: "Men's Toilet"
+      }
+    ]
+  },
+
   5: {
     left: [],
-    main: ['501','502','503','504','505','506'].map(n=>({key:n,label:`Room ${n}`,kind:'classroom'})),
+    main: ['501', '502', '503', '504', '505', '506'].map(n => ({
+      key: n,
+      label: `Room ${n}`,
+      kind: 'classroom'
+    })),
     right: []
   }
 };
@@ -323,6 +386,75 @@ const FLOOR_PLANS = {
 function normaliseRoomValue(value=''){
   return String(value).toLowerCase().replace(/[^a-z0-9]/g,'');
 }
+
+
+function isExcludedDestination(room) {
+  const floor = Number(room.floor_number);
+  const name = normaliseRoomValue(room.room_name);
+  const number = normaliseRoomValue(room.room_number);
+
+  // First floor: no Faculty Toilet
+  if (floor === 1 && name.includes('facultytoilet')) {
+    return true;
+  }
+
+  // Second floor: only the six requested destinations
+  if (
+    floor === 2 &&
+    (
+      name.includes('cicsstudentservices') ||
+      name.includes('facultytoilet')
+    )
+  ) {
+    return true;
+  }
+
+  // Third floor: Room 301 does not exist
+  if (
+    floor === 3 &&
+    (number === '301' || name === 'room301')
+  ) {
+    return true;
+  }
+
+  // Fourth floor: hide the duplicate Room 402 record.
+  // Physics Lab will represent RM 402.
+  if (
+    floor === 4 &&
+    number === '402' &&
+    !name.includes('physicslab')
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+function getVisibleDestinationRooms() {
+  return rooms.filter(room => !isExcludedDestination(room));
+}
+
+function getDisplayRoomName(room) {
+  if (
+    Number(room.floor_number) === 4 &&
+    normaliseRoomValue(room.room_number) === 'physicslab'
+  ) {
+    return 'Physics Lab / RM 402';
+  }
+
+  return room.room_name;
+}
+
+function getRoomSearchText(room) {
+  return [
+    getDisplayRoomName(room),
+    room.room_name,
+    room.room_number,
+    room.room_type,
+    room.floor_name
+  ].join(' ').toLowerCase();
+}
+
 function roomForPlanSlot(slot, floorRooms){
   const key=normaliseRoomValue(slot.key);
   const label=normaliseRoomValue(slot.label);
@@ -353,7 +485,8 @@ function roomCategory(slot, room){
 function renderRooms(){
   const floor=floors.find(f=>Number(f.id)===Number(selectedFloor));
   if(!floor){$('#roomGrid').innerHTML='<div class="empty-floor">No floor information is available.</div>';return;}
-  const floorRooms=rooms.filter(r=>Number(r.floor_id)===Number(floor.id));
+  const floorRooms = getVisibleDestinationRooms()
+  .filter(r => Number(r.floor_id) === Number(floor.id));
   const query=$('#mapSearch').value.trim().toLowerCase();
   const plan=FLOOR_PLANS[Number(floor.floor_number)]||{left:[],main:floorRooms.map(r=>({key:String(r.room_number),label:r.room_name,kind:r.room_type?.toLowerCase()==='office'?'office':r.room_type?.toLowerCase()==='laboratory'?'lab':'classroom'})),right:[]};
   const allSlots=[...plan.left,...plan.main,...plan.right];
@@ -414,7 +547,7 @@ function renderRoomDetails(){
   if(r){
     const floor=floors.find(f=>Number(f.id)===Number(r.floor_id));
     const roomType=(r.room_type||'Destination').toUpperCase();
-    $('#roomDetails').innerHTML=`<div class="location-banner"><span class="destination-pin">⌖</span><b>DESTINATION SELECTED</b></div><div class="room-details-content"><div class="selected-destination"><small class="detail-type">${escapeHtml(roomType)}</small><h3>${escapeHtml(r.room_name)}</h3><p class="muted">⌁ &nbsp; ${escapeHtml(floor?.floor_name||r.floor_name||'CICS Building')}, CICS Building</p></div><div class="navigation-guide"><b>⌖ &nbsp; Navigation guide</b><p>Go to the ${escapeHtml(ordinalFloor(floor?.floor_number||''))} floor. Use the floor plan to identify the highlighted destination, then follow the building's hallway from the stairs. Confirm the exact route with on-site signs or staff.</p></div><button class="btn outline report-room-action" id="reportRoomBtn">⚠ &nbsp; Report a problem here</button></div>`;
+    $('#roomDetails').innerHTML=`<div class="location-banner"><span class="destination-pin">⌖</span><b>DESTINATION SELECTED</b></div><div class="room-details-content"><div class="selected-destination"><small class="detail-type">${escapeHtml(roomType)}</small><h3>${escapeHtml(getDisplayRoomName(r))}</h3><p class="muted">⌁ &nbsp; ${escapeHtml(floor?.floor_name||r.floor_name||'CICS Building')}, CICS Building</p></div><div class="navigation-guide"><b>⌖ &nbsp; Navigation guide</b><p>Go to the ${escapeHtml(ordinalFloor(floor?.floor_number||''))} floor. Use the floor plan to identify the highlighted destination, then follow the building's hallway from the stairs. Confirm the exact route with on-site signs or staff.</p></div><button class="btn outline report-room-action" id="reportRoomBtn">⚠ &nbsp; Report a problem here</button></div>`;
   }else{
     $('#roomDetails').innerHTML=`<div class="location-banner"><span class="destination-pin">⌖</span><b>SELECT A DESTINATION</b></div><div class="room-details-content"><div><small class="detail-type">CICS BUILDING</small><h3>Choose a room or facility</h3><p class="muted">Select any room on the floor plan to view its location and navigation guide.</p></div><div class="navigation-guide"><b>⌖ &nbsp; Navigation guide</b><p>Your selected destination and directions will appear here.</p></div></div>`;
   }
@@ -422,7 +555,7 @@ function renderRoomDetails(){
 }
 $('#mapSearch').addEventListener('input',()=>{
   const q=$('#mapSearch').value.trim().toLowerCase();
-  if(q){const match=rooms.find(r=>`${r.room_name} ${r.room_number} ${r.room_type}`.toLowerCase().includes(q));if(match){selectedFloor=Number(match.floor_id);selectedRoom=null;}}
+  if(q){const match = getVisibleDestinationRooms().find(r => getRoomSearchText(r).includes(q));if(match){selectedFloor=Number(match.floor_id);selectedRoom=null;}}
   renderFloorSelector([...floors].sort((a,b)=>Number(b.floor_number)-Number(a.floor_number)));renderRooms();
 });
 $('#clearSearch').addEventListener('click',()=>{$('#mapSearch').value='';renderFloorSelector([...floors].sort((a,b)=>Number(b.floor_number)-Number(a.floor_number)));renderRooms();});
@@ -444,12 +577,14 @@ function destinationCategory(room){
 }
 function destinationIcon(category){return category==='Laboratories'?'♧':category==='Offices'?'▤':category==='Facilities'?'♙':'▣';}
 function getDirectoryRooms(){
-  let list=[...rooms];
+  let list = getVisibleDestinationRooms();
   if(directoryMode==='laboratories') list=list.filter(r=>destinationCategory(r)==='Laboratories');
   if(directoryMode==='offices') list=list.filter(r=>destinationCategory(r)==='Offices' && ([1,2].includes(Number(r.floor_number))) && (Number(r.floor_number)!==1 || /orgs/i.test(r.room_name||'')));
   if(directoryCategory!=='All') list=list.filter(r=>destinationCategory(r)===directoryCategory);
   const q=$('#directorySearch').value.trim().toLowerCase();
-  if(q)list=list.filter(r=>`${r.room_name} ${r.room_number} ${r.room_type} ${r.floor_name}`.toLowerCase().includes(q));
+  if (q) {
+  list = list.filter(r => getRoomSearchText(r).includes(q));
+}
   return list.sort((a,b)=>Number(a.floor_number)-Number(b.floor_number)||String(a.room_number).localeCompare(String(b.room_number),undefined,{numeric:true}));
 }
 function renderDirectoryPage(){
@@ -469,7 +604,7 @@ function renderDirectoryPage(){
     const floorName=floorRooms[0]?.floor_name||`${ordinalFloor(number)} Floor`;
     return `<section class="directory-floor-row"><div class="directory-floor-heading"><span class="directory-floor-number">${number}</span><div><b>${escapeHtml(floorName)}</b><small>${floorRooms.length} destination${floorRooms.length===1?'':'s'}</small></div></div><div class="directory-tile-grid">${floorRooms.map(r=>{
       const category=destinationCategory(r); const kind=category.toLowerCase();
-      return `<button type="button" class="directory-tile ${kind}" data-directory-room="${r.id}" aria-label="View ${escapeHtml(r.room_name)} on map"><span class="directory-tile-icon">${destinationIcon(category)}</span><b>${escapeHtml(r.room_name)}</b><small>${escapeHtml(r.room_number||category)}</small><span class="directory-tile-floor">${category}</span></button>`;
+      return `<button type="button" class="directory-tile ${kind}" data-directory-room="${r.id}" aria-label="View ${escapeHtml(r.room_name)} on map"><span class="directory-tile-icon">${destinationIcon(category)}</span><b>${escapeHtml(getDisplayRoomName(r))}</b><small>${escapeHtml(r.room_number||category)}</small><span class="directory-tile-floor">${category}</span></button>`;
     }).join('')}</div></section>`;
   }).join('');
   $('#directoryResults').innerHTML=list.length?floorMarkup:'<div class="directory-empty"><b>No matching destinations found.</b><p>Try another search or choose a different category.</p></div>';
