@@ -310,7 +310,7 @@ const FLOOR_PLANS = {
   2: {
     left: [
   {
-    key: 'FACULTY-TOILET',
+    key: 'WOMEN-FACULTY-TOILET',
     label: 'Faculty Toilet',
     kind: 'facility',
     short: 'Faculty Toilet'
@@ -326,7 +326,7 @@ const FLOOR_PLANS = {
     ],
     right: [
   {
-    key: 'FACULTY-TOILET',
+    key: 'MEN-FACULTY-TOILET',
     label: 'Faculty Toilet',
     kind: 'facility',
     short: 'Faculty Toilet'
@@ -481,7 +481,8 @@ function roomForPlanSlot(slot, floorRooms) {
     cicsorgsoffice: ['orgsoffice', 'cicsorgsoffice'],
     utilityroom: ['utility', 'utilityroom'],
     womenstoilet: ['womenstoilet', 'womensrestroom'],
-    facultytoilet: ['facultytoilet'],
+    womenfacultytoilet: ['womenfacultytoilet'],
+    menfacultytoilet: ['menfacultytoilet'],
     menstoilet: ['menstoilet', 'mensrestroom'],
     physicslab: ['physicslab'],
     smartclassroom: ['smartclassroom', 'smart'],
