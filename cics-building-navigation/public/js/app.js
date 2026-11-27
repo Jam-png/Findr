@@ -297,11 +297,25 @@ const FLOOR_PLANS = {
         short: 'Utility Room'
       }
     ],
-    right: []
+    right: [
+    {
+      key: 'MENS-TOILET',
+      label: "Men's Toilet",
+      kind: 'facility',
+      short: "Men's Toilet"
+    }
+  ]
   },
 
   2: {
-    left: [],
+    left: [
+  {
+    key: 'FACULTY-TOILET',
+    label: 'Faculty Toilet',
+    kind: 'facility',
+    short: 'Faculty Toilet'
+  }
+],
     main: [
       { key: '201', label: 'Room 201', kind: 'classroom' },
       { key: '202', label: 'Room 202', kind: 'classroom' },
@@ -310,7 +324,14 @@ const FLOOR_PLANS = {
       { key: 'D', label: 'CICS Faculty', kind: 'office' },
       { key: 'E', label: "Dean's Office", kind: 'office' }
     ],
-    right: []
+    right: [
+  {
+    key: 'FACULTY-TOILET',
+    label: 'Faculty Toilet',
+    kind: 'facility',
+    short: 'Faculty Toilet'
+  }
+]
   },
 
   3: {
@@ -455,17 +476,36 @@ function getRoomSearchText(room) {
   ].join(' ').toLowerCase();
 }
 
-function roomForPlanSlot(slot, floorRooms){
-  const key=normaliseRoomValue(slot.key);
-  const label=normaliseRoomValue(slot.label);
-  const aliases={
-    cicsorgsoffice:['orgsoffice','cicsorgsoffice'], utilityroom:['utility','utilityroom'],
-    womenstoilet:['womenstoilet','womensrestroom'], facultytoilet:['facultytoilet'],
-    menstoilet:['menstoilet','mensrestroom'], physicslab:['physicslab'],
-    smartclassroom:['smartclassroom'], techlab:['techlab','technologylaboratory']
+function roomForPlanSlot(slot, floorRooms) {
+  const key = normaliseRoomValue(slot.key);
+  const label = normaliseRoomValue(slot.label);
+
+  const aliases = {
+    cicsorgsoffice: ['orgsoffice', 'cicsorgsoffice'],
+    utilityroom: ['utility', 'utilityroom'],
+    womenstoilet: ['womenstoilet', 'womensrestroom'],
+    facultytoilet: ['facultytoilet'],
+    menstoilet: ['menstoilet', 'mensrestroom'],
+    physicslab: ['physicslab'],
+    smartclassroom: ['smartclassroom', 'smart'],
+    edl: ['edl'],
+    techlab: ['techlab', 'technologylaboratory']
   };
-  const candidates=[key,label,...(aliases[normaliseRoomValue(slot.label)]||[])];
-  return floorRooms.find(r=>candidates.includes(normaliseRoomValue(r.room_number)) || candidates.includes(normaliseRoomValue(r.room_name)));
+
+  const candidates = [
+    key,
+    label,
+    ...(aliases[key] || []),
+    ...(aliases[label] || [])
+  ];
+
+  return floorRooms.find(room => {
+    const roomNumber = normaliseRoomValue(room.room_number);
+    const roomName = normaliseRoomValue(room.room_name);
+
+    return candidates.includes(roomNumber) ||
+           candidates.includes(roomName);
+  });
 }
 function ordinalFloor(n){return ({1:'1ST',2:'2ND',3:'3RD',4:'4TH',5:'5TH'})[Number(n)]||`${n}TH`;}
 function renderFloorSelector(orderedFloors){
