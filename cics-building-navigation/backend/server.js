@@ -1,25 +1,27 @@
 require('dotenv').config();
 const express = require('express');
+const bcrypt = require('bcryptjs');
 
 const multer = require('multer');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
-const bcrypt = require('bcryptjs');
 const db = require('./db');
 
 const { createClient } = require('@supabase/supabase-js');
 
-const authClient = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY,
-  {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-      detectSessionInUrl: false
-    }
-  }
-);
+const authClient = process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY
+  ? createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_ANON_KEY,
+      {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+          detectSessionInUrl: false
+        }
+      }
+    )
+  : null;
 
 const { sendReportNotification } = require('./email');
 
@@ -31,19 +33,6 @@ const STORAGE_BUCKET = process.env.SUPABASE_STORAGE_BUCKET || 'report-images';
 app.set('trust proxy', 1);
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
-
-app.get('/api/config', (_req, res) => {
-  if (!process.env.SUPABASE_ANON_KEY) {
-    return res.status(503).json({
-      error: 'Supabase Auth is not configured.'
-    });
-  }
-
-  res.json({
-    supabaseUrl: process.env.SUPABASE_URL,
-    supabaseAnonKey: process.env.SUPABASE_ANON_KEY
-  });
-});
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -75,16 +64,24 @@ async function attachUser(req, _res, next) {
     const header = req.headers.authorization || '';
     const token = header.startsWith('Bearer ') ? header.slice(7) : '';
     if (!token) { req.user = null; return next(); }
+
     const { data: authData, error: authError } = await db.auth.getUser(token);
-    if (authError || !authData?.user) { req.user = null; return next(); }
+    if (authError || !authData?.user?.email) {
+      req.user = null;
+      return next();
+    }
+
+    // Match the verified Supabase Auth identity to the existing Findr profile by email.
+    // This deliberately avoids depending on PostgREST's auth_user_id schema cache.
     const { data: profile, error } = await db.from('users')
-      .select('id,auth_user_id,full_name,username,email,role')
-      .eq('auth_user_id', authData.user.id)
+      .select('id,full_name,username,email,role')
+      .ilike('email', authData.user.email)
       .maybeSingle();
     if (error) throw error;
     req.user = profile || null;
     next();
-  } catch (_error) {
+  } catch (error) {
+    console.error('[Findr auth profile lookup]', error);
     req.user = null;
     next();
   }
@@ -113,6 +110,9 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 app.use(attachUser);
 
 app.get('/api/config', (_req, res) => {
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
+    return res.status(503).json({ error: 'Supabase Auth is not configured on the server.' });
+  }
   res.json({
     supabaseUrl: process.env.SUPABASE_URL,
     supabaseAnonKey: process.env.SUPABASE_ANON_KEY
@@ -148,132 +148,225 @@ app.get('/api/integrations/status', requireAuth, requireAdmin, async (_req, res,
 app.post('/api/auth/register', authLimiter, async (req, res, next) => {
   let authUserId = null;
   try {
-    const { full_name, username, email, password, role = 'student', admin_code } = req.body;
-    if (!full_name || !username || !email || !password) return res.status(400).json({ error: 'Please complete all required fields.' });
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Enter a valid email address.' });
-    if (String(password).length < 8) return res.status(400).json({ error: 'Password must contain at least 8 characters.' });
-    if (!['student', 'admin'].includes(role)) return res.status(400).json({ error: 'Invalid account type.' });
-    if (role === 'admin' && (!ADMIN_REGISTRATION_CODE || admin_code !== ADMIN_REGISTRATION_CODE)) return res.status(403).json({ error: 'Invalid administrator registration code.' });
+    const { full_name, username, email, password, role = 'student', admin_code } = req.body || {};
+    if (!full_name || !username || !email || !password) {
+      return res.status(400).json({ error: 'Please complete all required fields.' });
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim())) {
+      return res.status(400).json({ error: 'Enter a valid email address.' });
+    }
+    if (String(password).length < 8) {
+      return res.status(400).json({ error: 'Password must contain at least 8 characters.' });
+    }
+    if (!['student', 'admin'].includes(role)) {
+      return res.status(400).json({ error: 'Invalid account type.' });
+    }
+    if (role === 'admin' && (!ADMIN_REGISTRATION_CODE || admin_code !== ADMIN_REGISTRATION_CODE)) {
+      return res.status(403).json({ error: 'Invalid administrator registration code.' });
+    }
 
     const cleanEmail = String(email).trim().toLowerCase();
+    const cleanUsername = String(username).trim();
+    const cleanName = String(full_name).trim();
+
+    // Create the Supabase Auth identity first. The profile keeps its existing Findr ID.
     const created = await db.auth.admin.createUser({
-      email: cleanEmail, password: String(password), email_confirm: true,
-      user_metadata: { full_name: String(full_name).trim(), username: String(username).trim() }
+      email: cleanEmail,
+      password: String(password),
+      email_confirm: true,
+      user_metadata: { full_name: cleanName, username: cleanUsername }
     });
-    if (created.error) throw created.error;
+    if (created.error) {
+      if (created.error.code === 'email_exists' || /already registered|already been registered/i.test(created.error.message || '')) {
+        return res.status(409).json({ error: 'This email is already registered.' });
+      }
+      throw created.error;
+    }
     authUserId = created.data.user.id;
 
-    const password_hash = await bcrypt.hash(password, 12); // temporary legacy compatibility only
     const profile = await db.from('users').insert({
-      full_name: String(full_name).trim(), username: String(username).trim(), email: cleanEmail,
-      password_hash, role, auth_user_id: authUserId
+      full_name: cleanName,
+      username: cleanUsername,
+      email: cleanEmail,
+      password_hash: null,
+      role
     }).select('id').single();
+
     if (profile.error) throw profile.error;
-    res.status(201).json({ message: 'Account created successfully. You can now log in.', id: profile.data.id });
+    res.status(201).json({
+      message: 'Account created successfully. You can now log in.',
+      id: profile.data.id
+    });
   } catch (error) {
-    if (authUserId) await db.auth.admin.deleteUser(authUserId).catch(() => {});
-    if (error.code === '23505') return res.status(409).json({ error: 'Username or email already exists.' });
+    if (authUserId) {
+      const cleanup = await db.auth.admin.deleteUser(authUserId);
+      if (cleanup.error) console.error('[Findr registration cleanup]', cleanup.error);
+    }
+    if (error.code === '23505') {
+      return res.status(409).json({ error: 'Username or email already exists.' });
+    }
     next(error);
   }
 });
 
 app.post('/api/auth/login', authLimiter, async (req, res, next) => {
   try {
-    const { identifier, password, role } = req.body;
-    if (!identifier || !password || !['student', 'admin'].includes(role)) return res.status(400).json({ error: 'Enter your login details and account type.' });
-
-    const value = String(identifier).trim();
-    let profile = await db.from('users').select('*').eq('username', value).eq('role', role).maybeSingle();
-    if (profile.error) throw profile.error;
-    if (!profile.data) profile = await db.from('users').select('*').eq('email', value.toLowerCase()).eq('role', role).maybeSingle();
-    if (profile.error) throw profile.error;
-    let user = profile.data;
-    let authSession = null
-    if (!user) return res.status(401).json({ error: 'Incorrect login details or account type.' });
-
-    // If this is a legacy record, verify its existing bcrypt password, then create/link its Auth identity.
-    if (!user.auth_user_id) {
-      if (!(await bcrypt.compare(String(password), user.password_hash))) return res.status(401).json({ error: 'Incorrect login details or account type.' });
-      const created = await db.auth.admin.createUser({
-        email: user.email, password: String(password), email_confirm: true,
-        user_metadata: { full_name: user.full_name, username: user.username }
-      });
-      if (created.error) throw created.error;
-     console.log('[LOGIN] Attempting to link legacy account:', user.id);
-
-const linked = await db
-  .from('users')
-  .update({ auth_user_id: created.data.user.id })
-  .eq('id', user.id)
-  .select('*')
-  .single();
-
-if (linked.error) {
-  console.error('[LOGIN] Account linking failed:', linked.error);
-  await db.auth.admin.deleteUser(created.data.user.id).catch(() => {});
-  throw linked.error;
-}
-
-console.log('[LOGIN] Account linked successfully.');
-user = linked.data;
-    } else {
-      const signedIn = await authClient.auth.signInWithPassword({
-  email: user.email,
-  password: String(password)
-});
-
-if (signedIn.error) {
-  return res.status(401).json({ error: 'Incorrect login details or account type.' });
-}
-
-if (signedIn.data.user.id !== user.auth_user_id) {
-  return res.status(401).json({
-    error: 'This account is not linked correctly. Contact the Findr administrator.'
-  });
-}
-
-authSession = signedIn.data.session;
+    const { identifier, password, role } = req.body || {};
+    if (!identifier || !password || !['student', 'admin'].includes(role)) {
+      return res.status(400).json({ error: 'Enter your login details and account type.' });
     }
 
-    // Confirm the newly migrated identity can authenticate before issuing the app cookie.
-    if (!user.auth_user_id) return res.status(500).json({ error: 'Unable to link this account to Supabase Auth.' });
-   if (user.auth_user_id && !profile.data.auth_user_id) {
-  const check = await authClient.auth.signInWithPassword({
-    email: user.email,
-    password: String(password)
-  });
+    const value = String(identifier).trim();
+    let profileResult = await db.from('users')
+      .select('id,full_name,username,email,role,password_hash')
+      .eq('username', value)
+      .eq('role', role)
+      .maybeSingle();
 
-  if (
-    check.error ||
-    check.data.user.id !== user.auth_user_id
-  ) {
-    return res.status(401).json({
-      error: 'Unable to verify the migrated account.'
+    if (profileResult.error) throw profileResult.error;
+
+    if (!profileResult.data) {
+      profileResult = await db.from('users')
+        .select('id,full_name,username,email,role,password_hash')
+        .eq('email', value.toLowerCase())
+        .eq('role', role)
+        .maybeSingle();
+      if (profileResult.error) throw profileResult.error;
+    }
+
+    const user = profileResult.data;
+    if (!user) {
+      return res.status(401).json({ error: 'Incorrect login details or account type.' });
+    }
+    if (!authClient) {
+      return res.status(503).json({ error: 'Supabase Auth is not configured. Check SUPABASE_ANON_KEY in Vercel.' });
+    }
+
+    // First try Supabase Auth. This works for new accounts and accounts already migrated.
+    let signedIn = await authClient.auth.signInWithPassword({
+      email: user.email,
+      password: String(password)
     });
+
+    // Migrate an older bcrypt-only Findr account on its first successful login.
+    if (signedIn.error && user.password_hash) {
+      const legacyPasswordMatches = await bcrypt.compare(String(password), user.password_hash);
+      if (!legacyPasswordMatches) {
+        return res.status(401).json({ error: 'Incorrect login details or account type.' });
+      }
+
+      const created = await db.auth.admin.createUser({
+        email: user.email,
+        password: String(password),
+        email_confirm: true,
+        user_metadata: { full_name: user.full_name, username: user.username }
+      });
+
+      if (created.error) {
+        // An Auth identity may already exist after an interrupted earlier migration.
+        signedIn = await authClient.auth.signInWithPassword({
+          email: user.email,
+          password: String(password)
+        });
+        if (signedIn.error) {
+          console.error('[Findr legacy account migration]', created.error);
+          return res.status(401).json({
+            error: 'This account needs a password reset before it can be used. Select Forgot Password.'
+          });
+        }
+      } else {
+        signedIn = await authClient.auth.signInWithPassword({
+          email: user.email,
+          password: String(password)
+        });
+      }
+    }
+
+    if (signedIn.error || !signedIn.data?.session) {
+      return res.status(401).json({ error: 'Incorrect login details or account type.' });
+    }
+
+    res.json({
+      message: 'Login successful.',
+      user: publicUser(user),
+      access_token: signedIn.data.session.access_token,
+      refresh_token: signedIn.data.session.refresh_token
+    });
+  } catch (error) {
+    next(error);
   }
-
-  authSession = check.data.session;
-}
-    if (!authSession) {
-  return res.status(500).json({
-    error: 'Unable to create a login session.'
-  });
-}
-
-res.json({
-  message: 'Login successful.',
-  user: publicUser(user),
-  access_token: authSession.access_token,
-  refresh_token: authSession.refresh_token
 });
-  } catch (error) { next(error); }
+
+
+// Password recovery supports both existing Supabase Auth users and older
+// Findr-only profiles that have not yet been migrated to Supabase Auth.
+app.post('/api/auth/forgot-password', authLimiter, async (req, res, next) => {
+  let newlyCreatedAuthUserId = null;
+  try {
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: 'Enter a valid email address.' });
+    }
+    if (!authClient) {
+      return res.status(503).json({
+        error: 'Supabase Auth is not configured. Check SUPABASE_ANON_KEY in Vercel.'
+      });
+    }
+
+    const genericMessage = 'If an account exists for that email, a password-reset link has been sent. Please check your inbox.';
+    const { data: profile, error: profileError } = await db.from('users')
+      .select('id,email')
+      .ilike('email', email)
+      .maybeSingle();
+    if (profileError) throw profileError;
+    if (!profile) return res.json({ message: genericMessage });
+
+    // If this is a legacy profile with no Auth identity yet, create one with
+    // a random unusable password. The user will choose their own via recovery.
+    const temporaryPassword = `${require('crypto').randomBytes(32).toString('base64url')}Aa1!`;
+    const created = await db.auth.admin.createUser({
+      email,
+      password: temporaryPassword,
+      email_confirm: true
+    });
+
+    if (!created.error) {
+      newlyCreatedAuthUserId = created.data.user.id;
+    } else if (
+      created.error.code !== 'email_exists' &&
+      !/already registered|already been registered/i.test(created.error.message || '')
+    ) {
+      throw created.error;
+    }
+
+    const appBaseUrl = process.env.PASSWORD_RESET_REDIRECT_URL || req.headers.origin;
+    if (!appBaseUrl) {
+      throw new Error('PASSWORD_RESET_REDIRECT_URL is not configured.');
+    }
+    const redirectTo = new URL('/?reset-password=1', appBaseUrl).toString();
+
+    const { error: recoveryError } = await authClient.auth.resetPasswordForEmail(email, {
+      redirectTo
+    });
+    if (recoveryError) throw recoveryError;
+
+    res.json({ message: genericMessage });
+  } catch (error) {
+    // If delivery failed, remove only the temporary identity created by this request.
+    if (newlyCreatedAuthUserId) {
+      const cleanup = await db.auth.admin.deleteUser(newlyCreatedAuthUserId);
+      if (cleanup.error) console.error('[Findr recovery cleanup]', cleanup.error);
+    }
+    next(error);
+  }
 });
 
 app.post('/api/auth/logout', (_req, res) => {
-  // Supabase session is cleared by the browser SDK; this endpoint remains for compatibility.
   res.json({ message: 'Logged out.' });
 });
-app.get('/api/auth/me', (req, res) => res.json({ user: req.user ? publicUser(req.user) : null }));
+app.get('/api/auth/me', (req, res) => {
+  res.json({ user: req.user ? publicUser(req.user) : null });
+});
 
 // Building directory
 app.get('/api/buildings', async (_req, res, next) => {
