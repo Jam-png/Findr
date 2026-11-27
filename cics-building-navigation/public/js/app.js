@@ -509,6 +509,8 @@ async function loadAdminReports(){
     adminReportCache.forEach(r=>{if(counts[r.status]!==undefined)counts[r.status]++;});
     $('#adminReportSummary').innerHTML=`<div><b>${adminReportCache.length}</b><small>Total reports</small></div><div><b>${counts.Submitted}</b><small>New</small></div><div><b>${counts['Under Review']}</b><small>Under review</small></div><div><b>${counts['In Progress']}</b><small>In progress</small></div><div><b>${counts.Resolved}</b><small>Resolved</small></div>`;
     renderAdminReports();
+    renderAdminCalendar();
+    renderCalendarDayReports();
   }catch(err){target.innerHTML=`<div class="directory-empty"><b>Unable to load reports</b><p>${escapeHtml(err.message)}</p></div>`;}
 }
 function renderAdminReports(){
@@ -526,6 +528,233 @@ function renderAdminReports(){
 $('#adminReportRefresh').addEventListener('click',loadAdminReports);
 $('#adminReportFilter').addEventListener('change',e=>{adminReportStatusFilter=e.target.value;renderAdminReports();});
 
+
+/* =========================================
+   ADMIN REPORT CALENDAR
+   Uses actual report created_at timestamps.
+   Calendar dates use Asia/Manila timezone.
+========================================= */
+
+function getManilaDateKey(value) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Manila',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(new Date(value));
+
+  const date = {};
+  parts.forEach(part => {
+    if (part.type !== 'literal') {
+      date[part.type] = part.value;
+    }
+  });
+
+  return `${date.year}-${date.month}-${date.day}`;
+}
+
+function formatCalendarDate(dateKey) {
+  const [year, month, day] = dateKey.split('-').map(Number);
+
+  return new Intl.DateTimeFormat('en-PH', {
+    timeZone: 'Asia/Manila',
+    dateStyle: 'full'
+  }).format(new Date(Date.UTC(year, month - 1, day, 12)));
+}
+
+function getReportsForDate(dateKey) {
+  return adminReportCache.filter(report =>
+    report.created_at &&
+    getManilaDateKey(report.created_at) === dateKey
+  );
+}
+
+function renderAdminCalendar() {
+  const grid = $('#adminCalendarGrid');
+  const monthLabel = $('#adminCalendarMonth');
+
+  if (!grid || !monthLabel) return;
+
+  const year = calendarDate.getFullYear();
+  const month = calendarDate.getMonth();
+
+  monthLabel.textContent = new Intl.DateTimeFormat('en-PH', {
+    month: 'long',
+    year: 'numeric'
+  }).format(calendarDate);
+
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const todayKey = getManilaDateKey(new Date());
+
+  let html = weekdays.map(day =>
+    `<div class="calendar-weekday">${day}</div>`
+  ).join('');
+
+  for (let i = 0; i < firstDay; i++) {
+    html += '<div class="calendar-day empty"></div>';
+  }
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateKey = [
+      year,
+      String(month + 1).padStart(2, '0'),
+      String(day).padStart(2, '0')
+    ].join('-');
+
+    const reports = getReportsForDate(dateKey);
+    const isToday = dateKey === todayKey;
+    const isSelected = dateKey === selectedCalendarDate;
+
+    html += `
+      <button
+        type="button"
+        class="calendar-day
+          ${reports.length ? 'has-reports' : ''}
+          ${isToday ? 'today' : ''}
+          ${isSelected ? 'selected' : ''}"
+        data-calendar-date="${dateKey}"
+        aria-label="${dateKey}, ${reports.length} reports"
+      >
+        <span class="calendar-day-number">${day}</span>
+
+        ${reports.length ? `
+          <span class="calendar-report-count">
+            ${reports.length} report${reports.length === 1 ? '' : 's'}
+          </span>
+        ` : ''}
+      </button>
+    `;
+  }
+
+  grid.innerHTML = html;
+
+  const monthReports = adminReportCache.filter(report => {
+    if (!report.created_at) return false;
+
+    const reportDate = getManilaDateKey(report.created_at);
+    const [reportYear, reportMonth] = reportDate.split('-').map(Number);
+
+    return reportYear === year && reportMonth === month + 1;
+  });
+
+  const countElement = $('#adminCalendarMonthCount');
+
+  if (countElement) {
+    countElement.textContent =
+      `${monthReports.length} report${monthReports.length === 1 ? '' : 's'} this month`;
+  }
+
+  grid.querySelectorAll('[data-calendar-date]').forEach(button => {
+    button.addEventListener('click', () => {
+      selectedCalendarDate = button.dataset.calendarDate;
+
+      renderAdminCalendar();
+      renderCalendarDayReports();
+    });
+  });
+}
+
+function renderCalendarDayReports() {
+  const target = $('#adminCalendarDayReports');
+
+  if (!target) return;
+
+  if (!selectedCalendarDate) {
+    target.innerHTML = `
+      <div class="directory-empty">
+        <b>Select a date</b>
+        <p>Choose a day on the calendar to view its submitted reports.</p>
+      </div>
+    `;
+    return;
+  }
+
+  const reports = getReportsForDate(selectedCalendarDate);
+
+  if (!reports.length) {
+    target.innerHTML = `
+      <div class="directory-empty">
+        <b>No reports on this date</b>
+        <p>${escapeHtml(formatCalendarDate(selectedCalendarDate))}</p>
+      </div>
+    `;
+    return;
+  }
+
+  target.innerHTML = `
+    <div class="calendar-selected-date">
+      <h3>${escapeHtml(formatCalendarDate(selectedCalendarDate))}</h3>
+      <p>${reports.length} submitted report${reports.length === 1 ? '' : 's'}</p>
+    </div>
+
+    <div class="calendar-report-list">
+      ${reports.map(report => `
+        <article class="calendar-report-item">
+          <div class="calendar-report-heading">
+            <b>${escapeHtml(report.title || 'Untitled report')}</b>
+            <span class="status-pill">
+              ${escapeHtml(report.status || 'Submitted')}
+            </span>
+          </div>
+
+          <p>
+            ${escapeHtml(report.full_name || report.contact_name || 'Unknown user')}
+          </p>
+
+          <p>
+            ${escapeHtml(report.category || 'Uncategorized')}
+            ·
+            ${escapeHtml(report.room_name || 'Location not specified')}
+          </p>
+
+          <p class="muted">
+            ${escapeHtml(report.building_name || 'CICS Building')}
+          </p>
+
+          ${report.description ? `
+            <p>${escapeHtml(report.description)}</p>
+          ` : ''}
+
+          ${report.image_url ? `
+            <a href="${escapeHtml(report.image_url)}"
+               target="_blank"
+               rel="noopener noreferrer">
+              View attachment
+            </a>
+          ` : ''}
+        </article>
+      `).join('')}
+    </div>
+  `;
+}
+
+function changeCalendarMonth(amount) {
+  calendarDate = new Date(
+    calendarDate.getFullYear(),
+    calendarDate.getMonth() + amount,
+    1
+  );
+
+  selectedCalendarDate = null;
+
+  renderAdminCalendar();
+  renderCalendarDayReports();
+}
+
+$('#adminCalendarPrev')?.addEventListener('click', () => {
+  changeCalendarMonth(-1);
+});
+
+$('#adminCalendarNext')?.addEventListener('click', () => {
+  changeCalendarMonth(1);
+});
+
+$('#adminCalendarRefresh')?.addEventListener('click', async () => {
+  await loadAdminReports();
+});
 
 (async function init(){
   try {
@@ -563,3 +792,269 @@ $('#adminReportFilter').addEventListener('change',e=>{adminReportStatusFilter=e.
     }
   }
 })();
+
+
+/* =========================================
+   ADMIN REPORT CALENDAR
+   Uses each report's actual created_at value.
+   Displays dates in Asia/Manila.
+========================================= */
+
+let calendarDate = new Date();
+let selectedCalendarDate = null;
+
+function getManilaDateKey(value) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Manila',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(new Date(value));
+}
+
+function getManilaDateParts(value) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Manila',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric'
+  }).formatToParts(new Date(value));
+
+  const result = {};
+  parts.forEach(part => {
+    if (part.type !== 'literal') {
+      result[part.type] = Number(part.value);
+    }
+  });
+
+  return result;
+}
+
+function formatCalendarDate(dateKey) {
+  const [year, month, day] = dateKey.split('-').map(Number);
+
+  return new Intl.DateTimeFormat('en-PH', {
+    timeZone: 'Asia/Manila',
+    dateStyle: 'full'
+  }).format(new Date(Date.UTC(year, month - 1, day, 12)));
+}
+
+function getReportsForDate(dateKey) {
+  return adminReportCache.filter(report =>
+    report.created_at &&
+    getManilaDateKey(report.created_at) === dateKey
+  );
+}
+
+function renderAdminCalendar() {
+  const grid = $('#adminCalendarGrid');
+  const monthLabel = $('#adminCalendarMonth');
+
+  if (!grid || !monthLabel) return;
+
+  const year = calendarDate.getFullYear();
+  const month = calendarDate.getMonth();
+
+  const monthName = new Intl.DateTimeFormat('en-PH', {
+    month: 'long',
+    year: 'numeric'
+  }).format(calendarDate);
+
+  monthLabel.textContent = monthName;
+
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+  const todayKey = getManilaDateKey(new Date());
+
+  let html = weekdays.map(day =>
+    `<div class="calendar-weekday">${day}</div>`
+  ).join('');
+
+  for (let i = 0; i < firstDay; i++) {
+    html += '<div class="calendar-day empty"></div>';
+  }
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateKey = [
+      year,
+      String(month + 1).padStart(2, '0'),
+      String(day).padStart(2, '0')
+    ].join('-');
+
+    const reports = getReportsForDate(dateKey);
+    const isToday = dateKey === todayKey;
+    const isSelected = dateKey === selectedCalendarDate;
+
+    html += `
+      <button
+        type="button"
+        class="calendar-day
+          ${reports.length ? 'has-reports' : ''}
+          ${isToday ? 'today' : ''}
+          ${isSelected ? 'selected' : ''}"
+        data-calendar-date="${dateKey}"
+        aria-label="${dateKey}, ${reports.length} reports"
+      >
+        <span class="calendar-day-number">${day}</span>
+        ${reports.length
+          ? `<span class="calendar-report-count">
+               ${reports.length} report${reports.length === 1 ? '' : 's'}
+             </span>`
+          : ''}
+      </button>
+    `;
+  }
+
+  grid.innerHTML = html;
+
+  const monthReports = adminReportCache.filter(report => {
+    if (!report.created_at) return false;
+
+    const parts = getManilaDateParts(report.created_at);
+
+    return parts.year === year && parts.month === month + 1;
+  });
+
+  const countElement = $('#adminCalendarMonthCount');
+
+  if (countElement) {
+    countElement.textContent =
+      `${monthReports.length} report${monthReports.length === 1 ? '' : 's'} this month`;
+  }
+
+  grid.querySelectorAll('[data-calendar-date]').forEach(button => {
+    button.addEventListener('click', () => {
+      selectedCalendarDate = button.dataset.calendarDate;
+
+      renderAdminCalendar();
+      renderCalendarDayReports();
+    });
+  });
+
+  if (selectedCalendarDate) {
+    const [selectedYear, selectedMonth] =
+      selectedCalendarDate.split('-').map(Number);
+
+    if (selectedYear !== year || selectedMonth !== month + 1) {
+      selectedCalendarDate = null;
+      renderCalendarDayReports();
+    }
+  }
+}
+
+function renderCalendarDayReports() {
+  const target = $('#adminCalendarDayReports');
+
+  if (!target) return;
+
+  if (!selectedCalendarDate) {
+    target.innerHTML = `
+      <div class="directory-empty">
+        <b>Select a date</b>
+        <p>Choose a day on the calendar to view its submitted reports.</p>
+      </div>
+    `;
+    return;
+  }
+
+  const reports = getReportsForDate(selectedCalendarDate);
+
+  if (!reports.length) {
+    target.innerHTML = `
+      <div class="directory-empty">
+        <b>No reports on this date</b>
+        <p>${escapeHtml(formatCalendarDate(selectedCalendarDate))}</p>
+      </div>
+    `;
+    return;
+  }
+
+  target.innerHTML = `
+    <div class="calendar-selected-date">
+      <h3>${escapeHtml(formatCalendarDate(selectedCalendarDate))}</h3>
+      <p>${reports.length} submitted report${reports.length === 1 ? '' : 's'}</p>
+    </div>
+
+    <div class="calendar-report-list">
+      ${reports.map(report => `
+        <article class="calendar-report-item">
+          <div class="calendar-report-heading">
+            <b>${escapeHtml(report.title || 'Untitled report')}</b>
+            <span class="status-pill">
+              ${escapeHtml(report.status || 'Submitted')}
+            </span>
+          </div>
+
+          <p>
+            ${escapeHtml(report.full_name || report.contact_name || 'Unknown user')}
+          </p>
+
+          <p>
+            ${escapeHtml(report.category || 'Uncategorized')}
+            ·
+            ${escapeHtml(report.room_name || 'Location not specified')}
+          </p>
+
+          <p class="muted">
+            ${escapeHtml(report.building_name || 'CICS Building')}
+          </p>
+
+          ${report.description
+            ? `<p>${escapeHtml(report.description)}</p>`
+            : ''}
+
+          ${report.image_url
+            ? `<a href="${escapeHtml(report.image_url)}"
+                 target="_blank"
+                 rel="noopener noreferrer">View attachment</a>`
+            : ''}
+        </article>
+      `).join('')}
+    </div>
+  `;
+}
+
+function changeCalendarMonth(amount) {
+  calendarDate = new Date(
+    calendarDate.getFullYear(),
+    calendarDate.getMonth() + amount,
+    1
+  );
+
+  selectedCalendarDate = null;
+
+  renderAdminCalendar();
+  renderCalendarDayReports();
+}
+
+$('#adminCalendarPrev')?.addEventListener('click', () => {
+  changeCalendarMonth(-1);
+});
+
+$('#adminCalendarNext')?.addEventListener('click', () => {
+  changeCalendarMonth(1);
+});
+
+$('#adminCalendarRefresh')?.addEventListener('click', async () => {
+  await loadAdminReports();
+  renderAdminCalendar();
+  renderCalendarDayReports();
+});
+
+/*
+ * Extend the existing admin report loader so the calendar
+ * refreshes whenever the administrator refreshes the reports.
+ */
+const originalLoadAdminReports = loadAdminReports;
+
+loadAdminReports = async function () {
+  await originalLoadAdminReports();
+
+  if (currentUser?.role === 'admin') {
+    renderAdminCalendar();
+    renderCalendarDayReports();
+  }
+};
